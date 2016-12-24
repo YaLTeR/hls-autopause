@@ -7,6 +7,8 @@
 #![plugin(interpolate_idents)]
 
 extern crate kernel32;
+#[macro_use]
+extern crate lazy_static;
 extern crate libc;
 extern crate psapi;
 extern crate user32;
@@ -14,6 +16,7 @@ extern crate winapi;
 
 use std::mem::{size_of, uninitialized};
 use std::ptr::null_mut;
+use std::sync::Mutex;
 use std::thread;
 use winapi::{
 	BOOL,
@@ -34,7 +37,9 @@ use patterns::find_pattern;
 const DLL_PROCESS_ATTACH: DWORD = 1;
 const DLL_PROCESS_DETACH: DWORD = 0;
 
-static mut minhook_holder: Option<minhook::MinHook> = None;
+lazy_static! {
+	static ref minhook_holder: Mutex<Option<minhook::MinHook>> = Mutex::new(None);
+}
 
 #[no_mangle]
 pub extern "stdcall" fn DllMain(instance: HINSTANCE, reason: DWORD, _reserved: LPVOID) -> BOOL {
@@ -47,9 +52,7 @@ pub extern "stdcall" fn DllMain(instance: HINSTANCE, reason: DWORD, _reserved: L
 			thread::spawn(main_thread);
 		},
 		DLL_PROCESS_DETACH => {
-			unsafe {
-				minhook_holder = None;
-			}
+			*minhook_holder.lock().unwrap() = None;
 		}
 		_ => {}
 	}
@@ -109,6 +112,8 @@ fn initialize(minhook: &minhook::MinHook) -> Result<(), String> {
 }
 
 fn main_thread() {
+	let mut guard = minhook_holder.lock().unwrap();
+
 	let mh = match minhook::MinHook::new() {
 		Ok(m) => m,
 		Err(err) => {
@@ -121,7 +126,5 @@ fn main_thread() {
 		msgbox(&err);
 	}
 
-	unsafe {
-		minhook_holder = Some(mh);
-	}
+	*guard = Some(mh);
 }

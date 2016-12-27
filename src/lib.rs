@@ -16,7 +16,6 @@ extern crate winapi;
 
 use std::mem::{size_of, uninitialized};
 use std::ptr::null_mut;
-use std::sync::Mutex;
 use std::thread;
 use winapi::{
 	BOOL,
@@ -37,10 +36,6 @@ use patterns::find_pattern;
 const DLL_PROCESS_ATTACH: DWORD = 1;
 const DLL_PROCESS_DETACH: DWORD = 0;
 
-lazy_static! {
-	static ref minhook_holder: Mutex<Option<minhook::MinHook>> = Mutex::new(None);
-}
-
 #[no_mangle]
 pub extern "stdcall" fn DllMain(instance: HINSTANCE, reason: DWORD, _reserved: LPVOID) -> BOOL {
 	match reason {
@@ -52,7 +47,7 @@ pub extern "stdcall" fn DllMain(instance: HINSTANCE, reason: DWORD, _reserved: L
 			thread::spawn(main_thread);
 		},
 		DLL_PROCESS_DETACH => {
-			*minhook_holder.lock().unwrap() = None;
+			minhook::uninitialize();
 		}
 		_ => {}
 	}
@@ -89,7 +84,7 @@ fn get_module_info(name: &str) -> Option<ModuleInfo> {
 	None
 }
 
-fn initialize(minhook: &minhook::MinHook) -> Result<(), String> {
+fn initialize() -> Result<(), String> {
 	let engine = try!(get_module_info("engine.dll").ok_or("Could not get engine.dll module info."));
 	let server = try!(get_module_info("server.dll").ok_or("Could not get server.dll module info."));
 
@@ -101,30 +96,18 @@ fn initialize(minhook: &minhook::MinHook) -> Result<(), String> {
 	unsafe {
 		hooks::Cbuf_AddText = *(&addr_Cbuf_AddText as *const _ as *const extern "C" fn(*const libc::c_char));
 
-		try!(hook!(minhook, addr_Host_Spawn_f, hooks::MyHost_Spawn_f, &mut hooks::Host_Spawn_f).map_err(|e| format!("Error creating hook: {}", e)));
-		try!(hook!(minhook, addr_Host_UnPause_f, hooks::MyHost_UnPause_f, &mut hooks::Host_UnPause_f).map_err(|e| format!("Error creating hook: {}", e)));
-		try!(hook!(minhook, addr_CHL1GameMovement__CheckJumpButton, hooks::MyCHL1GameMovement__CheckJumpButton, &mut hooks::CHL1GameMovement__CheckJumpButton).map_err(|e| format!("Error creating hook: {}", e)));
+		try!(hook!(addr_Host_Spawn_f, hooks::MyHost_Spawn_f, &mut hooks::Host_Spawn_f).map_err(|e| format!("Error creating hook: {}", e)));
+		try!(hook!(addr_Host_UnPause_f, hooks::MyHost_UnPause_f, &mut hooks::Host_UnPause_f).map_err(|e| format!("Error creating hook: {}", e)));
+		try!(hook!(addr_CHL1GameMovement__CheckJumpButton, hooks::MyCHL1GameMovement__CheckJumpButton, &mut hooks::CHL1GameMovement__CheckJumpButton).map_err(|e| format!("Error creating hook: {}", e)));
 	}
 
-	try!(minhook.enable_hook(None).map_err(|e| format!("Error enabling hooks: {}", e)));
+	try!(minhook::enable_hook(None).map_err(|e| format!("Error enabling hooks: {}", e)));
 
 	Ok(())
 }
 
 fn main_thread() {
-	let mut guard = minhook_holder.lock().unwrap();
-
-	let mh = match minhook::MinHook::new() {
-		Ok(m) => m,
-		Err(err) => {
-			msgbox(&format!("Error initializing MinHook: {}", err));
-			return;
-		}
-	};
-
-	if let Err(err) = initialize(&mh) {
+	if let Err(err) = initialize() {
 		msgbox(&err);
 	}
-
-	*guard = Some(mh);
 }

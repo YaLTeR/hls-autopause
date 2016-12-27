@@ -29,87 +29,122 @@ fn status_to_string(status: MH_STATUS) -> String {
 }
 
 #[derive(Debug)]
-pub struct Error {
+pub struct MinHookError {
 	status: MH_STATUS,
 	description: String,
 }
 
-impl fmt::Display for Error {
+impl fmt::Display for MinHookError {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		write!(f, "{}", &self.description)
 	}
 }
 
-impl error::Error for Error {
+impl error::Error for MinHookError {
 	fn description(&self) -> &str {
 		&self.description
 	}
 }
 
-impl Error {
+impl MinHookError {
 	fn new(status: MH_STATUS) -> Self {
-		Error { status: status, description: status_to_string(status) }
+		MinHookError { status: status, description: status_to_string(status) }
 	}
 }
 
-pub type Result<T> = result::Result<T, Error>;
-
-pub struct MinHook {
-	_h: ()
+#[derive(Debug)]
+pub enum Error<'a> {
+	InitError(&'a MinHookError),
+	OperationError(MinHookError),
 }
 
-impl MinHook {
-	pub fn new() -> Result<Self> {
-		unsafe {
-			match MH_Initialize() {
-				MH_OK => Ok(MinHook { _h: () }),
-				err => Err(Error::new(err))
-			}
-		}
-	}
-
-	pub fn create_hook<F: Copy>(&self, target: LPVOID, detour: F, trampoline: &mut F) -> Result<()> {
-		unsafe {
-			let temp = *trampoline;
-			*trampoline = detour;
-			let detour = *(trampoline as *const _ as *const LPVOID);
-
-			match MH_CreateHook(target, detour, trampoline as *mut _ as *mut LPVOID) {
-				MH_OK => Ok(()),
-				err => {
-					*trampoline = temp;
-					Err(Error::new(err))
-				}
-			}
-		}
-	}
-
-	pub fn enable_hook(&self, target: Option<LPVOID>) -> Result<()> {
-		unsafe {
-			let target = target.unwrap_or(ptr::null_mut());
-
-			match MH_EnableHook(target) {
-				MH_OK => Ok(()),
-				err => Err(Error::new(err))
-			}
+impl<'a> fmt::Display for Error<'a> {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match *self {
+			Error::InitError(_) => {
+				write!(f, "MinHook initialization error: {}", (self as &error::Error).description())
+			},
+			Error::OperationError(_) => {
+				write!(f, "{}", (self as &error::Error).description())
+			},
 		}
 	}
 }
 
-impl Drop for MinHook {
-	fn drop(&mut self) {
-		unsafe {
-			MH_Uninitialize();
+impl<'a> error::Error for Error<'a> {
+	fn description(&self) -> &str {
+		match *self {
+			Error::InitError(e) => &e.description,
+			Error::OperationError(ref e) => &e.description,
+		}
+	}
+
+	fn cause(&self) -> Option<&error::Error> {
+		match *self {
+			Error::InitError(e) => Some(e),
+			Error::OperationError(ref e) => Some(e),
+		}
+	}
+}
+
+pub type Result<'a, T> = result::Result<T, Error<'a>>;
+
+lazy_static! {
+	static ref mh_init_result: result::Result<(), MinHookError> = unsafe {
+		match MH_Initialize() {
+			MH_OK => Ok(()),
+			err => Err(MinHookError::new(err))
+		}
+	};
+}
+
+pub fn uninitialize() {
+	if mh_init_result.is_ok() {
+		unsafe { MH_Uninitialize(); }
+	}
+}
+
+pub fn create_hook<F: Copy>(target: LPVOID, detour: F, trampoline: &mut F) -> Result<'static, ()> {
+	if let Err(ref err) = *mh_init_result {
+		return Err(Error::InitError(err));
+	}
+
+	unsafe {
+		let temp = *trampoline;
+		*trampoline = detour;
+		let detour = *(trampoline as *const _ as *const LPVOID);
+
+		match MH_CreateHook(target, detour, trampoline as *mut _ as *mut LPVOID) {
+			MH_OK => Ok(()),
+			err => {
+				*trampoline = temp;
+				Err(Error::OperationError(MinHookError::new(err)))
+			}
+		}
+	}
+}
+
+pub fn enable_hook(target: Option<LPVOID>) -> Result<'static, ()> {
+	if let Err(ref err) = *mh_init_result {
+		return Err(Error::InitError(err));
+	}
+
+	let target = target.unwrap_or(ptr::null_mut());
+
+	unsafe {
+		match MH_EnableHook(target) {
+			MH_OK => Ok(()),
+			err => Err(Error::OperationError(MinHookError::new(err)))
 		}
 	}
 }
 
 macro_rules! hook {
-	($mh:expr, $target:expr, $detour:expr, $trampoline:expr) => {{
+	($target:expr, $detour:expr, $trampoline:expr) => {{
 		// This is needed to cast from function item type to function pointer type.
 		let mut temp = *$trampoline;
 		temp = $detour;
 
-		$mh.create_hook($target, temp, $trampoline)
+		$crate::minhook::create_hook($target, temp, $trampoline)
 	}}
 }

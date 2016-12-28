@@ -20,7 +20,10 @@ use winapi::*;
 #[macro_use]
 mod macros;
 
-mod hooks;
+mod hooks {
+	pub mod engine;
+	pub mod server;
+}
 mod minhook;
 mod moduleinfo;
 use moduleinfo::ModuleInfo;
@@ -54,8 +57,8 @@ fn initialize() -> Result<(), String> {
 	let server = try!(ModuleInfo::get("server.dll").ok_or("Could not get server.dll module info."));
 
 	unsafe {
-		try!(hooks::engine.hook(engine));
-		try!(hooks::server.hook(server));
+		try!(hooks::engine::engine.hook(engine));
+		try!(hooks::server::server.hook(server));
 	}
 
 	try!(minhook::enable_hook(None).map_err(|e| format!("Error enabling hooks: {}", e)));

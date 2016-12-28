@@ -138,13 +138,3 @@ pub fn enable_hook(target: Option<LPVOID>) -> Result<'static, ()> {
 		}
 	}
 }
-
-macro_rules! hook {
-	($target:expr, $detour:expr, $trampoline:expr) => {{
-		// This is needed to cast from function item type to function pointer type.
-		let mut temp = *$trampoline;
-		temp = $detour;
-
-		$crate::minhook::create_hook($target, temp, $trampoline)
-	}}
-}

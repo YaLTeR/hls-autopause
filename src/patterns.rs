@@ -36,24 +36,6 @@ pub fn find(module: &ModuleInfo, pattern: &Pattern) -> Option<LPVOID> {
 	None
 }
 
-macro_rules! pattern {
-	($name:ident G $size:expr $(; $byte:tt $mask:expr)* , ?? $($rest:tt)*) => (
-		pattern!($name G $size + 1 $(; $byte $mask)* ; 0x00 false , $($rest)*);
-	);
-
-	($name:ident G $size:expr $(; $byte:tt $mask:expr)* , $b:tt $($rest:tt)*) => (
-		pattern!($name G $size + 1 $(; $byte $mask)* ; $b true , $($rest)*);
-	);
-
-	($name:ident G $size:expr $(; $byte:tt $mask:expr)+ ,) => (
-		pub const $name: [(u8, bool); $size] = [$(($byte, $mask)),*];
-	);
-
-	($name:ident $($rest:tt)+) => (
-		pattern!($name G 0 , $($rest)*);
-	);
-}
-
 pattern!(Cbuf_AddText
 	0x8B 0x54 0x24 0x04 0x83 0xC9 0xFF 0x57 0x33 0xC0 0x8B 0xFA 0xF2 0xAE 0x8B 0x3D ?? ?? ?? ?? 0xA1 ?? ?? ?? ?? 0xF7 0xD1 0x49 0x03 0xCF 0x3B 0xC8
 );

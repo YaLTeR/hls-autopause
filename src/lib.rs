@@ -18,9 +18,10 @@ use std::thread;
 use winapi::*;
 
 #[macro_use]
-mod minhook;
+mod macros;
 
 mod hooks;
+mod minhook;
 mod moduleinfo;
 use moduleinfo::ModuleInfo;
 mod patterns;

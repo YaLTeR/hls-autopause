@@ -94,11 +94,11 @@ fn initialize() -> Result<(), String> {
 	let addr_CHL1GameMovement__CheckJumpButton = try!(find_pattern(&server, &patterns::CHL1GameMovement__CheckJumpButton).ok_or("Couldn't find CHL1GameMovement::CheckJumpButton()."));
 
 	unsafe {
-		hooks::Cbuf_AddText = *(&addr_Cbuf_AddText as *const _ as *const extern "C" fn(*const libc::c_char));
+		hooks::engine.Cbuf_AddText = *(&addr_Cbuf_AddText as *const _ as *const extern "C" fn(*const libc::c_char));
 
-		try!(hook!(addr_Host_Spawn_f, hooks::MyHost_Spawn_f, &mut hooks::Host_Spawn_f).map_err(|e| format!("Error creating hook: {}", e)));
-		try!(hook!(addr_Host_UnPause_f, hooks::MyHost_UnPause_f, &mut hooks::Host_UnPause_f).map_err(|e| format!("Error creating hook: {}", e)));
-		try!(hook!(addr_CHL1GameMovement__CheckJumpButton, hooks::MyCHL1GameMovement__CheckJumpButton, &mut hooks::CHL1GameMovement__CheckJumpButton).map_err(|e| format!("Error creating hook: {}", e)));
+		try!(hook!(addr_Host_Spawn_f, hooks::Engine::Host_Spawn_f_hook, &mut hooks::engine.Host_Spawn_f).map_err(|e| format!("Error creating hook: {}", e)));
+		try!(hook!(addr_Host_UnPause_f, hooks::Engine::Host_UnPause_f_hook, &mut hooks::engine.Host_UnPause_f).map_err(|e| format!("Error creating hook: {}", e)));
+		try!(hook!(addr_CHL1GameMovement__CheckJumpButton, hooks::Engine::CHL1GameMovement__CheckJumpButton_hook, &mut hooks::engine.CHL1GameMovement__CheckJumpButton).map_err(|e| format!("Error creating hook: {}", e)));
 	}
 
 	try!(minhook::enable_hook(None).map_err(|e| format!("Error enabling hooks: {}", e)));

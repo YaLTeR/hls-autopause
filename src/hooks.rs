@@ -49,6 +49,14 @@ macro_rules! hook_struct_impl {
 			unreachable!();
 		}
 
+		#[allow(dead_code)]
+		#[inline(always)]
+		pub extern $call fn $fname($($arg : $t),*) $(-> $rv)* {
+			unsafe {
+				($name.$fname)($($arg),*)
+			}
+		}
+
 		hook_struct_impl! { $name $($rest)* }
 	} );
 
@@ -66,6 +74,14 @@ macro_rules! hook_struct_impl {
 		pub extern $call fn [$fname _hook]($($arg : $t),*) $(-> $rv)* {
 			unsafe {
 				$name.[My $fname]($($arg),*)
+			}
+		}
+
+		#[allow(dead_code)]
+		#[inline(always)]
+		pub extern $call fn $fname($($arg : $t),*) $(-> $rv)* {
+			unsafe {
+				($name.$fname)($($arg),*)
 			}
 		}
 
@@ -125,7 +141,7 @@ hook_struct! {
 
 	impl Engine {
 		pub extern "C" fn Host_Spawn_f(&mut self) {
-			(self.Host_Spawn_f)();
+			Engine::Host_Spawn_f();
 
 			self.next_unpause_is_bad = true;
 		}
@@ -133,16 +149,16 @@ hook_struct! {
 		pub extern "C" fn Host_UnPause_f(&mut self) {
 			if self.next_unpause_is_bad {
 				self.next_unpause_is_bad = false;
-				(self.Cbuf_AddText)(CString::new("setpause\n").unwrap().as_ptr());
+				Engine::Cbuf_AddText(CString::new("setpause\n").unwrap().as_ptr());
 			}
 
-			(self.Host_UnPause_f)();
+			Engine::Host_UnPause_f();
 		}
 
 		pub extern "fastcall" fn CHL1GameMovement__CheckJumpButton(&mut self, this: *mut libc::c_void) {
-			(self.Cbuf_AddText)(CString::new("echo CheckJumpButton\n").unwrap().as_ptr());
+			Engine::Cbuf_AddText(CString::new("echo CheckJumpButton\n").unwrap().as_ptr());
 
-			(self.CHL1GameMovement__CheckJumpButton)(this);
+			Engine::CHL1GameMovement__CheckJumpButton(this);
 		}
 	}
 }

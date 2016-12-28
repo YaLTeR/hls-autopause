@@ -154,11 +154,17 @@ hook_struct! {
 
 			Engine::Host_UnPause_f();
 		}
+	}
+}
 
+hook_struct! {
+	server = pub struct Server {}
+
+	impl Server {
 		pub extern "fastcall" fn CHL1GameMovement__CheckJumpButton(&mut self, this: *mut libc::c_void) {
 			Engine::Cbuf_AddText(CString::new("echo CheckJumpButton\n").unwrap().as_ptr());
 
-			Engine::CHL1GameMovement__CheckJumpButton(this);
+			Server::CHL1GameMovement__CheckJumpButton(this);
 		}
 	}
 }

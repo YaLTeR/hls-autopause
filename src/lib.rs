@@ -98,7 +98,7 @@ fn initialize() -> Result<(), String> {
 
 		try!(hook!(addr_Host_Spawn_f, hooks::Engine::Host_Spawn_f_hook, &mut hooks::engine.Host_Spawn_f).map_err(|e| format!("Error creating hook: {}", e)));
 		try!(hook!(addr_Host_UnPause_f, hooks::Engine::Host_UnPause_f_hook, &mut hooks::engine.Host_UnPause_f).map_err(|e| format!("Error creating hook: {}", e)));
-		try!(hook!(addr_CHL1GameMovement__CheckJumpButton, hooks::Engine::CHL1GameMovement__CheckJumpButton_hook, &mut hooks::engine.CHL1GameMovement__CheckJumpButton).map_err(|e| format!("Error creating hook: {}", e)));
+		try!(hook!(addr_CHL1GameMovement__CheckJumpButton, hooks::Server::CHL1GameMovement__CheckJumpButton_hook, &mut hooks::server.CHL1GameMovement__CheckJumpButton).map_err(|e| format!("Error creating hook: {}", e)));
 	}
 
 	try!(minhook::enable_hook(None).map_err(|e| format!("Error enabling hooks: {}", e)));

@@ -1,10 +1,13 @@
 use kernel32;
 use psapi;
+use std::ffi::CString;
 use std::mem;
+use std::ptr;
 use utils;
 use winapi::*;
 
 pub struct ModuleInfo {
+	pub handle: HMODULE,
 	pub base: LPVOID,
 	pub size: usize
 }
@@ -17,11 +20,24 @@ impl ModuleInfo {
 			if !handle.is_null() {
 				let mut info = mem::uninitialized::<MODULEINFO>();
 				if psapi::GetModuleInformation(kernel32::GetCurrentProcess(), handle, &mut info, mem::size_of::<MODULEINFO>() as DWORD) != 0 {
-					return Some(ModuleInfo { base: info.lpBaseOfDll, size: info.SizeOfImage as usize });
+					return Some(ModuleInfo {
+						handle: handle,
+						base: info.lpBaseOfDll,
+						size: info.SizeOfImage as usize
+					});
 				}
 			}
 		}
 
 		None
+	}
+
+	pub fn get_function(&self, name: &str) -> Option<FARPROC> {
+		unsafe {
+			match kernel32::GetProcAddress(self.handle, CString::new(name).unwrap().as_ptr()) {
+				p if p == ptr::null() => None,
+				p => Some(p)
+			}
+		}
 	}
 }

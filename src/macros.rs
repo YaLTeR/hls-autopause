@@ -18,7 +18,7 @@ macro_rules! hook_struct_fields {
 
 	// Function field
 	($stype:ident pub $name:ident : extern $call:tt fn($($arg:ident : $t:ty),*) $(-> $rv:ty)* , $($rest:tt)*) => (
-		hook_struct_fields! { $stype $($rest)* F $name { extern $call fn($($arg : $t),*) $(-> $rv:ty)* } }
+		hook_struct_fields! { $stype $($rest)* F $name { extern $call fn($($arg : $t),*) $(-> $rv)* } }
 	);
 
 	// Function

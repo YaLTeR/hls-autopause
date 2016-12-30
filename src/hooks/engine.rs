@@ -50,8 +50,6 @@ impl ConCommand {
 	}
 }
 
-unsafe impl Sync for ConCommand {}
-
 // Not declared.
 type ConVar = ConCommandBase;
 

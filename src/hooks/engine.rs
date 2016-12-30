@@ -125,7 +125,7 @@ impl Engine {
 			let concommand_vtable = *((addr_ConCommand_constructor as *mut u8).offset(35) as *const *mut c_void);
 			test.base.vtable = concommand_vtable;
 
-			((*(*icvar).vtable).RegisterConCommandBase)(icvar, 0, &test as *const _ as *mut ConCommandBase);
+			((*(*icvar).vtable).RegisterConCommandBase)(icvar, 0, &mut test as *mut _ as *mut ConCommandBase);
 		}
 
 		Ok(())

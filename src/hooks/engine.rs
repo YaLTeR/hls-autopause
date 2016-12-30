@@ -4,6 +4,7 @@ use moduleinfo::ModuleInfo;
 use patterns;
 use std;
 use std::mem;
+use std::ops;
 use std::ptr;
 
 #[repr(C)]
@@ -29,6 +30,20 @@ pub struct ConCommand {
 	pub has_completion_callback: bool,
 }
 
+impl ops::Deref for ConCommand {
+	type Target = ConCommandBase;
+
+	fn deref(&self) -> &ConCommandBase {
+		unsafe { &*(self as *const _ as *const ConCommandBase) }
+	}
+}
+
+impl ops::DerefMut for ConCommand {
+	fn deref_mut(&mut self) -> &mut ConCommandBase {
+		unsafe { &mut *(self as *mut _ as *mut ConCommandBase) }
+	}
+}
+
 impl ConCommand {
 	extern "C" fn default_completion_callback(_partial: *const c_char, _commands: *const *mut c_char) -> c_int {
 		0
@@ -51,6 +66,12 @@ struct ICVarVtable {
 #[repr(C)]
 struct ICVar {
 	vtable: *mut ICVarVtable,
+}
+
+impl ICVar {
+	fn register_concommandbase(&mut self, concommandbase: &mut ConCommandBase) {
+		unsafe { ((*self.vtable).RegisterConCommandBase)(self, 0, concommandbase) };
+	}
 }
 
 const VENGINE_CVAR_INTERFACE_VERSION: *const c_char = cstr!(b"VEngineCvar001\0");
@@ -120,12 +141,13 @@ impl Engine {
 		try!(hook!(addr_Host_Spawn_f, Engine::Host_Spawn_f_hook, &mut self.Host_Spawn_f).map_err(|e| format!("Error creating hook: {}", e)));
 		try!(hook!(addr_Host_UnPause_f, Engine::Host_UnPause_f_hook, &mut self.Host_UnPause_f).map_err(|e| format!("Error creating hook: {}", e)));
 
-		let icvar = try!(self.create_interface(VENGINE_CVAR_INTERFACE_VERSION).ok_or("Couldn't get the ICVar interface from the engine.")) as *mut ICVar;
 		unsafe {
+			let icvar = &mut *(try!(self.create_interface(VENGINE_CVAR_INTERFACE_VERSION).ok_or("Couldn't get the ICVar interface from the engine.")) as *mut ICVar);
+
 			let concommand_vtable = *((addr_ConCommand_constructor as *mut u8).offset(35) as *const *mut c_void);
 			test.base.vtable = concommand_vtable;
 
-			((*(*icvar).vtable).RegisterConCommandBase)(icvar, 0, &mut test as *mut _ as *mut ConCommandBase);
+			icvar.register_concommandbase(&mut test);
 		}
 
 		Ok(())

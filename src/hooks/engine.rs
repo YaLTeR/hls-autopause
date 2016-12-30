@@ -103,24 +103,9 @@ hook_struct! {
 	}
 }
 
-extern "C" fn test_cmd() {
+con_command!(hello, b"hello\0" {
 	Engine::Cbuf_AddText(cstr!(b"echo hello\n\0"));
-}
-
-static mut test: ConCommand = ConCommand {
-	base: ConCommandBase {
-		vtable: 0 as *mut _,
-		next: 0 as *mut _,
-		registered: false,
-		name: cstr!(b"hello\0"),
-		help_string: 0 as *const _,
-		flags: 0,
-	},
-
-	callback: test_cmd,
-	completion_callback: ConCommand::default_completion_callback,
-	has_completion_callback: true,
-};
+});
 
 impl Engine {
 	pub fn hook(&mut self, module_info: ModuleInfo) -> Result<(), String> {
@@ -145,9 +130,9 @@ impl Engine {
 			let icvar = &mut *(try!(self.create_interface(VENGINE_CVAR_INTERFACE_VERSION).ok_or("Couldn't get the ICVar interface from the engine.")) as *mut ICVar);
 
 			let concommand_vtable = *((addr_ConCommand_constructor as *mut u8).offset(35) as *const *mut c_void);
-			test.base.vtable = concommand_vtable;
+			hello.base.vtable = concommand_vtable;
 
-			icvar.register_concommandbase(&mut test);
+			icvar.register_concommandbase(&mut hello);
 		}
 
 		Ok(())

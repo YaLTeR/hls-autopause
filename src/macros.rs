@@ -160,3 +160,24 @@ macro_rules! hook {
 macro_rules! cstr {
 	($s:expr) => ($s as *const _ as *const libc::c_char)
 }
+
+macro_rules! con_command {
+	($name:ident, $name_:tt $body:block) => ( interpolate_idents! {
+		extern "C" fn [$name _callback]() $body
+
+		static mut $name: $crate::hooks::engine::ConCommand = $crate::hooks::engine::ConCommand {
+			base:  $crate::hooks::engine::ConCommandBase {
+				vtable: 0 as *mut _,
+				next: 0 as *mut _,
+				registered: false,
+				name: cstr!($name_),
+				help_string: 0 as *const _,
+				flags: 0,
+			},
+
+			callback: [$name _callback],
+			completion_callback: ConCommand::default_completion_callback,
+			has_completion_callback: true,
+		};
+	} )
+}

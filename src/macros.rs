@@ -165,8 +165,8 @@ macro_rules! con_command {
 	($name:ident, $name_:tt $body:block) => ( interpolate_idents! {
 		extern "C" fn [$name _callback]() $body
 
-		static mut $name: $crate::hooks::engine::ConCommand = $crate::hooks::engine::ConCommand {
-			base:  $crate::hooks::engine::ConCommandBase {
+		static mut $name: $crate::hooks::engine::icvar::ConCommand = $crate::hooks::engine::icvar::ConCommand {
+			base:  $crate::hooks::engine::icvar::ConCommandBase {
 				vtable: 0 as *mut _,
 				next: 0 as *mut _,
 				registered: false,
@@ -176,7 +176,7 @@ macro_rules! con_command {
 			},
 
 			callback: [$name _callback],
-			completion_callback: ConCommand::default_completion_callback,
+			completion_callback: $crate::hooks::engine::icvar::ConCommand::default_completion_callback,
 			has_completion_callback: true,
 		};
 	} )

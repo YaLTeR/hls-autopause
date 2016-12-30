@@ -16,6 +16,8 @@ hook_struct! {
 		pub next_unpause_is_bad: bool = false,
 		pub Cbuf_AddText: extern "C" fn(text: *const c_char),
 		pub CreateInterface: extern "C" fn(name: *const c_char, return_code: *mut c_int) -> *mut c_void,
+		pub icvar: *mut ICVar = 0 as *mut _,
+		pub concommand_vtable: *mut c_void = 0 as *mut _,
 	}
 
 	impl Engine {
@@ -56,17 +58,15 @@ impl Engine {
 			self.CreateInterface = mem::transmute(addr_CreateInterface);
 		}
 
-		try!(hook!(addr_Host_Spawn_f, Engine::Host_Spawn_f_hook, &mut self.Host_Spawn_f).map_err(|e| format!("Error creating hook: {}", e)));
-		try!(hook!(addr_Host_UnPause_f, Engine::Host_UnPause_f_hook, &mut self.Host_UnPause_f).map_err(|e| format!("Error creating hook: {}", e)));
+		self.icvar = try!(self.create_interface(VENGINE_CVAR_INTERFACE_VERSION).ok_or("Couldn't get the ICVar interface from the engine.")) as *mut ICVar;
+		self.concommand_vtable = unsafe { *((addr_ConCommand_constructor as *mut u8).offset(35) as *const *mut c_void) };
 
 		unsafe {
-			let icvar = &mut *(try!(self.create_interface(VENGINE_CVAR_INTERFACE_VERSION).ok_or("Couldn't get the ICVar interface from the engine.")) as *mut ICVar);
-
-			let concommand_vtable = *((addr_ConCommand_constructor as *mut u8).offset(35) as *const *mut c_void);
-			hello.base.vtable = concommand_vtable;
-
-			icvar.register_concommandbase(&mut hello);
+			self.register_concmd(&mut hello);
 		}
+
+		try!(hook!(addr_Host_Spawn_f, Engine::Host_Spawn_f_hook, &mut self.Host_Spawn_f).map_err(|e| format!("Error creating hook: {}", e)));
+		try!(hook!(addr_Host_UnPause_f, Engine::Host_UnPause_f_hook, &mut self.Host_UnPause_f).map_err(|e| format!("Error creating hook: {}", e)));
 
 		Ok(())
 	}
@@ -75,6 +75,14 @@ impl Engine {
 		match (self.CreateInterface)(name, ptr::null_mut()) {
 			p if p == ptr::null_mut() => None,
 			p => Some(p)
+		}
+	}
+
+	fn register_concmd(&self, concmd: &mut ConCommand) {
+		concmd.base.vtable = self.concommand_vtable;
+
+		unsafe {
+			(*self.icvar).register_concommandbase(concmd);
 		}
 	}
 }

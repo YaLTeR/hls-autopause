@@ -3,6 +3,7 @@ use libc::*;
 use moduleinfo::ModuleInfo;
 use patterns;
 use std;
+use std::mem;
 use std::ptr;
 
 #[repr(C)]
@@ -112,8 +113,8 @@ impl Engine {
 		let addr_CreateInterface = try!(module_info.get_function(cstr!(b"CreateInterface\0")).ok_or("Couldn't get the address of CreateInterface()."));
 
 		unsafe {
-			self.Cbuf_AddText = *(&addr_Cbuf_AddText as *const _ as *const extern "C" fn(*const c_char));
-			self.CreateInterface = *(&addr_CreateInterface as *const _ as *const extern "C" fn(name: *const c_char, return_code: *mut c_int) -> *mut c_void);
+			self.Cbuf_AddText = mem::transmute(addr_Cbuf_AddText);
+			self.CreateInterface = mem::transmute(addr_CreateInterface);
 		}
 
 		try!(hook!(addr_Host_Spawn_f, Engine::Host_Spawn_f_hook, &mut self.Host_Spawn_f).map_err(|e| format!("Error creating hook: {}", e)));

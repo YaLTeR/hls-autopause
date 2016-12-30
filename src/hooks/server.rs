@@ -3,7 +3,6 @@ use libc;
 use moduleinfo::ModuleInfo;
 use patterns;
 use std;
-use std::ffi::CString;
 
 hook_struct! {
 	server = pub struct Server {
@@ -12,7 +11,7 @@ hook_struct! {
 
 	impl Server {
 		pub extern "fastcall" fn CHL1GameMovement__CheckJumpButton(&mut self, this: *mut libc::c_void) {
-			Engine::Cbuf_AddText(CString::new("echo CheckJumpButton\n").unwrap().as_ptr());
+			Engine::Cbuf_AddText(cstr!(b"echo CheckJumpButton\n\0"));
 
 			Server::CHL1GameMovement__CheckJumpButton(this);
 		}

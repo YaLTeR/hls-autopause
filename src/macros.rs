@@ -156,3 +156,7 @@ macro_rules! hook {
 		$crate::minhook::create_hook($target, temp, $trampoline)
 	}}
 }
+
+macro_rules! cstr {
+	($s:expr) => ($s as *const _ as *const libc::c_char)
+}

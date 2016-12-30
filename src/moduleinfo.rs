@@ -1,6 +1,5 @@
 use kernel32;
 use psapi;
-use std::ffi::CString;
 use std::mem;
 use std::ptr;
 use utils;
@@ -32,9 +31,9 @@ impl ModuleInfo {
 		None
 	}
 
-	pub fn get_function(&self, name: &str) -> Option<FARPROC> {
+	pub fn get_function(&self, name: LPCSTR) -> Option<FARPROC> {
 		unsafe {
-			match kernel32::GetProcAddress(self.handle, CString::new(name).unwrap().as_ptr()) {
+			match kernel32::GetProcAddress(self.handle, name) {
 				p if p == ptr::null() => None,
 				p => Some(p)
 			}

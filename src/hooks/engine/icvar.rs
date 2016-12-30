@@ -50,7 +50,7 @@ type ConVar = ConCommandBase;
 
 #[repr(C)]
 struct ICVarVtable {
-	pub RegisterConCommandBase: extern "fastcall" fn(this: *mut ICVar, edx: i32, variable: *mut ConCommandBase) -> *mut c_void,
+	pub RegisterConCommandBase: extern "fastcall" fn(this: *mut ICVar, edx: i32, variable: *mut ConCommandBase),
 	pub GetCommandLineValue: extern "fastcall" fn(this: *mut ICVar, edx: i32, variable_name: *const c_char) -> *const c_char,
 	pub FindVar: extern "fastcall" fn(this: *mut ICVar, edx: i32, name: *const c_char) -> *const ConVar,
 	pub GetCommands: extern "fastcall" fn(this: *mut ICVar) -> *mut ConCommandBase,

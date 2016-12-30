@@ -47,7 +47,7 @@ macro_rules! hook_struct_impl {
 
 		#[allow(dead_code)]
 		#[inline(always)]
-		pub extern $call fn $fname($($arg : $t),*) $(-> $rv)* {
+		pub fn $fname($($arg : $t),*) $(-> $rv)* {
 			unsafe {
 				($name.$fname)($($arg),*)
 			}
@@ -75,13 +75,13 @@ macro_rules! hook_struct_impl {
 
 		#[allow(dead_code)]
 		#[inline(always)]
-		pub extern $call fn $fname($($arg : $t),*) $(-> $rv)* {
+		pub fn $fname($($arg : $t),*) $(-> $rv)* {
 			unsafe {
 				($name.$fname)($($arg),*)
 			}
 		}
 
-		extern $call fn [My $fname](&mut $s, $($arg : $t),*) $(-> $rv)* $body
+		fn [My $fname](&mut $s, $($arg : $t),*) $(-> $rv)* $body
 
 	} hook_struct_impl! { $name $($rest)* } );
 

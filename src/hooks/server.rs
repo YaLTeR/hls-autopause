@@ -1,6 +1,5 @@
 use libc::*;
 use moduleinfo::ModuleInfo;
-use patterns;
 use std;
 
 hook_struct! {
@@ -52,13 +51,21 @@ hook_struct! {
 	}
 }
 
+pattern!(CHL1GameMovement__CheckJumpButton
+	0x83 0xEC 0x14 0x53 0x56 0x8B 0xF1 0x57 0x8B 0x7E 0x08 0x85 0xFF 0x74 0x12 0x8B 0x07 0x8B 0xCF 0xFF 0x90 0x60 0x01 0x00 0x00 0x84 0xC0 0x74 0x04 0x8B 0xCF 0xEB
+);
+
+pattern!(CGameMovement__FinishGravity
+	0x8B 0x51 0x08 0xD9 0x82 0xB0 0x0B 0x00 0x00 0xD8 0x1D ?? ?? ?? ?? 0xDF 0xE0 0xF6 0xC4 0x44 0x7A 0x4D 0xD9 0x82 0x08 0x02 0x00 0x00 0xD8 0x1D
+);
+
 impl Server {
 	pub fn hook(&mut self, module_info: ModuleInfo) -> Result<(), String> {
 		self.module_info = Some(module_info);
 		let module_info = self.module_info.as_ref().unwrap();
 
-		let addr_CHL1GameMovement__CheckJumpButton = try!(module_info.find(&patterns::CHL1GameMovement__CheckJumpButton).ok_or("Couldn't find CHL1GameMovement::CheckJumpButton()."));
-		let addr_CGameMovement__FinishGravity = try!(module_info.find(&patterns::CGameMovement__FinishGravity).ok_or("Couldn't find CGameMovement::FinishGravity()."));
+		let addr_CHL1GameMovement__CheckJumpButton = try!(module_info.find(&CHL1GameMovement__CheckJumpButton).ok_or("Couldn't find CHL1GameMovement::CheckJumpButton()."));
+		let addr_CGameMovement__FinishGravity = try!(module_info.find(&CGameMovement__FinishGravity).ok_or("Couldn't find CGameMovement::FinishGravity()."));
 
 		try!(hook!(self, addr_CHL1GameMovement__CheckJumpButton, CHL1GameMovement__CheckJumpButton).map_err(|e| format!("Error creating hook: {}", e)));
 		try!(hook!(self, addr_CGameMovement__FinishGravity, CGameMovement__FinishGravity).map_err(|e| format!("Error creating hook: {}", e)));

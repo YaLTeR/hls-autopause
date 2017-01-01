@@ -130,20 +130,20 @@ macro_rules! hook_struct {
 }
 
 macro_rules! pattern {
-	($name:ident G $size:expr $(; $byte:tt $mask:expr)* , ?? $($rest:tt)*) => (
-		pattern!($name G $size + 1 $(; $byte $mask)* ; 0x00 false , $($rest)*);
+	($name:ident $(; $byte:tt $mask:expr)* , ?? $($rest:tt)*) => (
+		pattern!($name $(; $byte $mask)* ; 0x00 false , $($rest)*);
 	);
 
-	($name:ident G $size:expr $(; $byte:tt $mask:expr)* , $b:tt $($rest:tt)*) => (
-		pattern!($name G $size + 1 $(; $byte $mask)* ; $b true , $($rest)*);
+	($name:ident $(; $byte:tt $mask:expr)* , $b:tt $($rest:tt)*) => (
+		pattern!($name $(; $byte $mask)* ; $b true , $($rest)*);
 	);
 
-	($name:ident G $size:expr $(; $byte:tt $mask:expr)+ ,) => (
-		pub const $name: [(u8, bool); $size] = [$(($byte, $mask)),*];
+	($name:ident $(; $byte:tt $mask:expr)+ ,) => (
+		pub const $name: $crate::pattern::Pattern = $crate::pattern::Pattern(&[$(($byte, $mask)),*]);
 	);
 
 	($name:ident $($rest:tt)+) => (
-		pattern!($name G 0 , $($rest)*);
+		pattern!($name , $($rest)*);
 	);
 }
 

@@ -1,15 +1,22 @@
-pub type Pattern = [(u8, bool)];
+#[derive(Clone, Copy)]
+pub struct Pattern(pub &'static [(u8, bool)]);
 
-pub fn compare(data: *const u8, pattern: &Pattern) -> bool {
-	for i in 0..pattern.len() {
-		let (b, m) = pattern[i];
-
-		unsafe {
-			if m && *data.offset(i as isize) != b {
-				return false;
-			}
-		}
+impl Pattern {
+	pub fn len(self) -> usize {
+		self.0.len()
 	}
 
-	true
+	pub fn compare(self, data: *const u8) -> bool {
+		for i in 0..self.0.len() {
+			let (b, m) = self.0[i];
+
+			unsafe {
+				if m && *data.offset(i as isize) != b {
+					return false;
+				}
+			}
+		}
+
+		true
+	}
 }

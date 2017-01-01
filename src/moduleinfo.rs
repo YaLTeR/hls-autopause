@@ -41,7 +41,7 @@ impl ModuleInfo {
 		}
 	}
 
-	pub fn find(&self, pattern: &pattern::Pattern) -> Option<LPVOID> {
+	pub fn find(&self, pattern: pattern::Pattern) -> Option<LPVOID> {
 		if self.size < pattern.len() {
 			return None;
 		}
@@ -52,7 +52,7 @@ impl ModuleInfo {
 		for i in 0..end {
 			let ptr = unsafe { start.offset(i as isize) };
 
-			if pattern::compare(ptr, pattern) {
+			if pattern.compare(ptr) {
 				return Some(ptr as LPVOID);
 			}
 		}

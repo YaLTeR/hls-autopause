@@ -53,7 +53,7 @@ pattern!(Host_UnPause_f
 	0xA0 ?? ?? ?? ?? 0x84 0xC0 0x74 0x59 0x8B 0x0D ?? ?? ?? ?? 0xB8 0x01 0x00 0x00 0x00 0x3B 0xC8 0x75 0x0A 0x50 0xE8
 );
 
-pattern!(ConCommand_constructor
+pattern!(ConCommand__ConCommand
 	0x8B 0x44 0x24 0x08 0x33 0xD2 0x56 0x8B 0xF1 0x89 0x46 0x18 0x8B 0x44 0x24 0x18 0x3B 0xC2 0x88 0x56 0x08 0x89 0x56 0x0C 0x89 0x56 0x10 0x89 0x56 0x14 0x89 0x56 0x04 0xC7 0x06
 );
 
@@ -65,7 +65,7 @@ impl Engine {
 		let addr_Cbuf_AddText = try!(module_info.find(Cbuf_AddText).ok_or("Couldn't find Cbuf_AddText()."));
 		let addr_Host_Spawn_f = try!(module_info.find(Host_Spawn_f).ok_or("Couldn't find Host_Spawn_f()."));
 		let addr_Host_UnPause_f = try!(module_info.find(Host_UnPause_f).ok_or("Couldn't find Host_UnPause_f()."));
-		let addr_ConCommand_constructor = try!(module_info.find(ConCommand_constructor).ok_or("Couldn't find ConCommand::ConCommand()."));
+		let addr_ConCommand__ConCommand = try!(module_info.find(ConCommand__ConCommand).ok_or("Couldn't find ConCommand::ConCommand()."));
 		let addr_CreateInterface = try!(module_info.get_function(cstr!(b"CreateInterface\0")).ok_or("Couldn't get the address of CreateInterface()."));
 
 		unsafe {
@@ -74,7 +74,7 @@ impl Engine {
 		}
 
 		self.icvar = try!(self.create_interface(VENGINE_CVAR_INTERFACE_VERSION).ok_or("Couldn't get the ICVar interface from the engine.")) as *mut ICVar;
-		self.concommand_vtable = unsafe { *((addr_ConCommand_constructor as *mut u8).offset(35) as *const *mut c_void) };
+		self.concommand_vtable = unsafe { *((addr_ConCommand__ConCommand as *mut u8).offset(35) as *const *mut c_void) };
 
 		unsafe {
 			self.register_concmd(&mut hello);

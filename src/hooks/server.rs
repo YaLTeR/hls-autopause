@@ -60,8 +60,8 @@ impl Server {
 		let addr_CHL1GameMovement__CheckJumpButton = try!(module_info.find(&patterns::CHL1GameMovement__CheckJumpButton).ok_or("Couldn't find CHL1GameMovement::CheckJumpButton()."));
 		let addr_CGameMovement__FinishGravity = try!(module_info.find(&patterns::CGameMovement__FinishGravity).ok_or("Couldn't find CGameMovement::FinishGravity()."));
 
-		try!(hook!(addr_CHL1GameMovement__CheckJumpButton, Server::CHL1GameMovement__CheckJumpButton_hook, &mut self.CHL1GameMovement__CheckJumpButton).map_err(|e| format!("Error creating hook: {}", e)));
-		try!(hook!(addr_CGameMovement__FinishGravity, Server::CGameMovement__FinishGravity_hook, &mut self.CGameMovement__FinishGravity).map_err(|e| format!("Error creating hook: {}", e)));
+		try!(hook!(self, addr_CHL1GameMovement__CheckJumpButton, CHL1GameMovement__CheckJumpButton).map_err(|e| format!("Error creating hook: {}", e)));
+		try!(hook!(self, addr_CGameMovement__FinishGravity, CGameMovement__FinishGravity).map_err(|e| format!("Error creating hook: {}", e)));
 
 		Ok(())
 	}

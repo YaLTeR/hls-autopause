@@ -65,8 +65,8 @@ impl Engine {
 			self.register_concmd(&mut hello);
 		}
 
-		try!(hook!(addr_Host_Spawn_f, Engine::Host_Spawn_f_hook, &mut self.Host_Spawn_f).map_err(|e| format!("Error creating hook: {}", e)));
-		try!(hook!(addr_Host_UnPause_f, Engine::Host_UnPause_f_hook, &mut self.Host_UnPause_f).map_err(|e| format!("Error creating hook: {}", e)));
+		try!(hook!(self, addr_Host_Spawn_f, Host_Spawn_f).map_err(|e| format!("Error creating hook: {}", e)));
+		try!(hook!(self, addr_Host_UnPause_f, Host_UnPause_f).map_err(|e| format!("Error creating hook: {}", e)));
 
 		Ok(())
 	}

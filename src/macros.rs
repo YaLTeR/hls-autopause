@@ -148,13 +148,16 @@ macro_rules! pattern {
 }
 
 macro_rules! hook {
-	($target:expr, $detour:expr, $trampoline:expr) => {{
-		// This is needed to cast from function item type to function pointer type.
-		let mut temp = *$trampoline;
-		temp = $detour;
+	($s:ident, $target:expr, $fname:ident) => {{ interpolate_idents! {
+		let detour = Self::[$fname _hook];
+		let trampoline = &mut $s.$fname;
 
-		$crate::minhook::create_hook($target, temp, $trampoline)
-	}}
+		// This is needed to cast from function item type to function pointer type.
+		let mut temp = *trampoline;
+		temp = detour;
+
+		$crate::minhook::create_hook($target, temp, trampoline)
+	} }}
 }
 
 macro_rules! cstr {

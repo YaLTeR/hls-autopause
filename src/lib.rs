@@ -27,7 +27,7 @@ mod hooks {
 mod minhook;
 mod moduleinfo;
 use moduleinfo::ModuleInfo;
-mod patterns;
+mod pattern;
 mod utils;
 
 const DLL_PROCESS_ATTACH: DWORD = 1;

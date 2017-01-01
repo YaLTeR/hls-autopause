@@ -1,5 +1,5 @@
 use kernel32;
-use patterns;
+use pattern;
 use psapi;
 use std::mem;
 use std::ptr;
@@ -41,7 +41,7 @@ impl ModuleInfo {
 		}
 	}
 
-	pub fn find(&self, pattern: &patterns::Pattern) -> Option<LPVOID> {
+	pub fn find(&self, pattern: &pattern::Pattern) -> Option<LPVOID> {
 		if self.size < pattern.len() {
 			return None;
 		}
@@ -52,7 +52,7 @@ impl ModuleInfo {
 		for i in 0..end {
 			let ptr = unsafe { start.offset(i as isize) };
 
-			if patterns::compare(ptr, pattern) {
+			if pattern::compare(ptr, pattern) {
 				return Some(ptr as LPVOID);
 			}
 		}

@@ -47,10 +47,10 @@ impl Engine {
 		self.module_info = Some(module_info);
 		let module_info = self.module_info.as_ref().unwrap();
 
-		let addr_Cbuf_AddText = try!(patterns::find(module_info, &patterns::Cbuf_AddText).ok_or("Couldn't find Cbuf_AddText()."));
-		let addr_Host_Spawn_f = try!(patterns::find(module_info, &patterns::Host_Spawn_f).ok_or("Couldn't find Host_Spawn_f()."));
-		let addr_Host_UnPause_f = try!(patterns::find(module_info, &patterns::Host_UnPause_f).ok_or("Couldn't find Host_UnPause_f()."));
-		let addr_ConCommand_constructor = try!(patterns::find(module_info, &patterns::ConCommand_constructor).ok_or("Couldn't find ConCommand::ConCommand()."));
+		let addr_Cbuf_AddText = try!(module_info.find(&patterns::Cbuf_AddText).ok_or("Couldn't find Cbuf_AddText()."));
+		let addr_Host_Spawn_f = try!(module_info.find(&patterns::Host_Spawn_f).ok_or("Couldn't find Host_Spawn_f()."));
+		let addr_Host_UnPause_f = try!(module_info.find(&patterns::Host_UnPause_f).ok_or("Couldn't find Host_UnPause_f()."));
+		let addr_ConCommand_constructor = try!(module_info.find(&patterns::ConCommand_constructor).ok_or("Couldn't find ConCommand::ConCommand()."));
 		let addr_CreateInterface = try!(module_info.get_function(cstr!(b"CreateInterface\0")).ok_or("Couldn't get the address of CreateInterface()."));
 
 		unsafe {

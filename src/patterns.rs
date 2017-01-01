@@ -1,9 +1,6 @@
-use moduleinfo::ModuleInfo;
-use winapi::*;
-
 pub type Pattern = [(u8, bool)];
 
-fn compare(data: *const u8, pattern: &Pattern) -> bool {
+pub fn compare(data: *const u8, pattern: &Pattern) -> bool {
 	for i in 0..pattern.len() {
 		let (b, m) = pattern[i];
 
@@ -15,25 +12,6 @@ fn compare(data: *const u8, pattern: &Pattern) -> bool {
 	}
 
 	true
-}
-
-pub fn find(module: &ModuleInfo, pattern: &Pattern) -> Option<LPVOID> {
-	if module.size < pattern.len() {
-		return None;
-	}
-
-	let start = module.base as *const u8;
-	let end = module.size - pattern.len();
-
-	for i in 0..end {
-		let ptr = unsafe { start.offset(i as isize) };
-
-		if compare(ptr, pattern) {
-			return Some(ptr as LPVOID);
-		}
-	}
-
-	None
 }
 
 // engine

@@ -80,8 +80,10 @@ impl Engine {
 			self.register_concmd(&mut hello);
 		}
 
-		try!(hook!(self, addr_Host_Spawn_f, Host_Spawn_f).map_err(|e| format!("Error creating hook: {}", e)));
-		try!(hook!(self, addr_Host_UnPause_f, Host_UnPause_f).map_err(|e| format!("Error creating hook: {}", e)));
+		hook!(self,
+			(addr_Host_Spawn_f, Host_Spawn_f),
+			(addr_Host_UnPause_f, Host_UnPause_f)
+		);
 
 		Ok(())
 	}

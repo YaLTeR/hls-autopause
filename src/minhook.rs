@@ -18,7 +18,8 @@ extern "system" {
 	fn MH_Initialize() -> MH_STATUS;
 	fn MH_Uninitialize() -> MH_STATUS;
 	fn MH_CreateHook(pTarget: LPVOID, pDetour: LPVOID, ppOriginal: *mut LPVOID) -> MH_STATUS;
-	fn MH_EnableHook(pTarget: LPVOID) -> MH_STATUS;
+	fn MH_QueueEnableHook(pTarget: LPVOID) -> MH_STATUS;
+	fn MH_ApplyQueued() -> MH_STATUS;
 	fn MH_StatusToString(status: MH_STATUS) -> *const libc::c_char;
 }
 
@@ -124,7 +125,7 @@ pub fn create_hook<F: Copy>(target: LPVOID, detour: F, trampoline: &mut F) -> Re
 	}
 }
 
-pub fn enable_hook(target: Option<LPVOID>) -> Result<'static, ()> {
+pub fn queue_enable_hook(target: Option<LPVOID>) -> Result<'static, ()> {
 	if let Err(ref err) = *mh_init_result {
 		return Err(Error::InitError(err));
 	}
@@ -132,7 +133,20 @@ pub fn enable_hook(target: Option<LPVOID>) -> Result<'static, ()> {
 	let target = target.unwrap_or(ptr::null_mut());
 
 	unsafe {
-		match MH_EnableHook(target) {
+		match MH_QueueEnableHook(target) {
+			MH_OK => Ok(()),
+			err => Err(Error::OperationError(MinHookError::new(err)))
+		}
+	}
+}
+
+pub fn apply_queued() -> Result<'static, ()> {
+	if let Err(ref err) = *mh_init_result {
+		return Err(Error::InitError(err));
+	}
+
+	unsafe {
+		match MH_ApplyQueued() {
 			MH_OK => Ok(()),
 			err => Err(Error::OperationError(MinHookError::new(err)))
 		}

@@ -148,16 +148,25 @@ macro_rules! pattern {
 }
 
 macro_rules! hook {
-	($s:ident, $target:expr, $fname:ident) => {{ interpolate_idents! {
-		let detour = Self::[$fname _hook];
-		let trampoline = &mut $s.$fname;
+	($s:ident, $(($target:expr, $fname:ident)),+) => {{
+		$(
+			try!({ interpolate_idents! {
+				let detour = Self::[$fname _hook];
+				let trampoline = &mut $s.$fname;
 
-		// This is needed to cast from function item type to function pointer type.
-		let mut temp = *trampoline;
-		temp = detour;
+				// This is needed to cast from function item type to function pointer type.
+				let mut temp = *trampoline;
+				temp = detour;
 
-		$crate::minhook::create_hook($target, temp, trampoline)
-	} }}
+				$crate::minhook::create_hook($target, temp, trampoline)
+					.map_err(|e| format!("Error creating hook: {}", e))
+					.and($crate::minhook::queue_enable_hook(Some($target))
+						.map_err(|e| format!("Error adding hook to enable queue: {}", e)))
+			} });
+		)*
+
+		try!($crate::minhook::apply_queued().map_err(|e| format!("Error enabling queued hooks: {}", e)));
+	}}
 }
 
 macro_rules! cstr {

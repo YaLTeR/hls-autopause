@@ -61,8 +61,6 @@ fn initialize() -> Result<(), String> {
 		try!(hooks::server::server.hook(server));
 	}
 
-	try!(minhook::enable_hook(None).map_err(|e| format!("Error enabling hooks: {}", e)));
-
 	Ok(())
 }
 

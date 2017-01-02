@@ -27,12 +27,16 @@ hook_struct! {
 		}
 
 		pub extern "C" fn Host_UnPause_f(&mut self) {
+			trace!(target: "engine", "Entering Host_UnPause_f()");
+
 			if self.next_unpause_is_bad {
 				self.next_unpause_is_bad = false;
 				Engine::Cbuf_AddText(cstr!(b"setpause\n\0"));
 			}
 
 			Engine::Host_UnPause_f();
+
+			trace!(target: "engine", "Leaving  Host_UnPause_f()");
 		}
 	}
 }

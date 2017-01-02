@@ -64,8 +64,13 @@ impl Server {
 		self.module_info = Some(module_info);
 		let module_info = self.module_info.as_ref().unwrap();
 
+		debug!(target: "server", "Base: {:p}; size = {}", module_info.base, module_info.size);
+
 		let addr_CHL1GameMovement__CheckJumpButton = try!(module_info.find(CHL1GameMovement__CheckJumpButton).ok_or("Couldn't find CHL1GameMovement::CheckJumpButton()."));
 		let addr_CGameMovement__FinishGravity = try!(module_info.find(CGameMovement__FinishGravity).ok_or("Couldn't find CGameMovement::FinishGravity()."));
+
+		debug!(target: "server", "{:p} - CHL1GameMovement::CheckJumpButton()", addr_CHL1GameMovement__CheckJumpButton);
+		debug!(target: "server", "{:p} - CGameMovement::FinishGravity()", addr_CGameMovement__FinishGravity);
 
 		hook!(self,
 			(addr_CHL1GameMovement__CheckJumpButton, CHL1GameMovement__CheckJumpButton),

@@ -12,6 +12,7 @@ interpolate_idents = "0.1"
 kernel32-sys = { git = "https://github.com/retep998/winapi-rs.git", rev = "2d9b5ba" }
 lazy_static = "0.2"
 libc = "0.2"
+log = "0.3"
 psapi-sys = { git = "https://github.com/retep998/winapi-rs.git", rev = "2d9b5ba" }
 user32-sys = { git = "https://github.com/retep998/winapi-rs.git", rev = "2d9b5ba" }
 winapi = { git = "https://github.com/retep998/winapi-rs.git", rev = "2d9b5ba" }

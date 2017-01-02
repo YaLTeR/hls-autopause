@@ -62,11 +62,19 @@ impl Engine {
 		self.module_info = Some(module_info);
 		let module_info = self.module_info.as_ref().unwrap();
 
+		debug!(target: "engine", "Base: {:p}; size = {}", module_info.base, module_info.size);
+
 		let addr_Cbuf_AddText = try!(module_info.find(Cbuf_AddText).ok_or("Couldn't find Cbuf_AddText()."));
 		let addr_Host_Spawn_f = try!(module_info.find(Host_Spawn_f).ok_or("Couldn't find Host_Spawn_f()."));
 		let addr_Host_UnPause_f = try!(module_info.find(Host_UnPause_f).ok_or("Couldn't find Host_UnPause_f()."));
 		let addr_ConCommand__ConCommand = try!(module_info.find(ConCommand__ConCommand).ok_or("Couldn't find ConCommand::ConCommand()."));
 		let addr_CreateInterface = try!(module_info.get_function(cstr!(b"CreateInterface\0")).ok_or("Couldn't get the address of CreateInterface()."));
+
+		debug!(target: "engine", "{:p} - Cbuf_AddText()", addr_Cbuf_AddText);
+		debug!(target: "engine", "{:p} - Host_Spawn_f()", addr_Host_Spawn_f);
+		debug!(target: "engine", "{:p} - Host_UnPause_f()", addr_Host_UnPause_f);
+		debug!(target: "engine", "{:p} - ConCommand::ConCommand()", addr_ConCommand__ConCommand);
+		debug!(target: "engine", "{:p} - CreateInterface()", addr_CreateInterface);
 
 		unsafe {
 			self.Cbuf_AddText = mem::transmute(addr_Cbuf_AddText);

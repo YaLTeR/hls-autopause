@@ -10,6 +10,8 @@ extern crate kernel32;
 #[macro_use]
 extern crate lazy_static;
 extern crate libc;
+#[macro_use]
+extern crate log;
 extern crate psapi;
 extern crate user32;
 extern crate winapi;
@@ -24,6 +26,7 @@ mod hooks {
 	pub mod engine;
 	pub mod server;
 }
+mod logger;
 mod minhook;
 mod moduleinfo;
 use moduleinfo::ModuleInfo;
@@ -53,6 +56,8 @@ pub extern "stdcall" fn DllMain(instance: HINSTANCE, reason: DWORD, _reserved: L
 }
 
 fn initialize() -> Result<(), String> {
+	try!(logger::init().map_err(|e| format!("Error initializing the logger: {}", e)));
+
 	let engine = try!(ModuleInfo::get("engine.dll").ok_or("Could not get engine.dll module info."));
 	let server = try!(ModuleInfo::get("server.dll").ok_or("Could not get server.dll module info."));
 

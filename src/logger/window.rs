@@ -6,12 +6,48 @@ use user32;
 use utils;
 use winapi::*;
 
+const CFM_COLOR: DWORD = 0x40000000;
+const CFM_FACE: DWORD = 0x20000000;
+const EM_EXSETSEL: UINT = WM_USER + 55;
+const EM_SETCHARFORMAT: UINT = WM_USER + 68;
+const EM_REPLACESEL: UINT = 0xC2;
+const ES_MULTILINE: DWORD = 0x4;
+const ES_AUTOVSCROLL: DWORD = 0x40;
+const ES_READONLY: DWORD = 0x800;
+const LF_FACESIZE: usize = 32;
+const SCF_DEFAULT: DWORD = 0x0;
+const SCF_SELECTION: DWORD = 0x1;
+
 static mut HWND_EDIT: HWND = 0 as HWND;
 
 lazy_static! {
 	static ref CLASS_NAME: Vec<u16> = utils::utf16("Debug Console");
 	static ref WINDOW_TITLE: Vec<u16> = utils::utf16("Debug Console");
+	static ref FONT_NAME: Vec<u16> = {
+		let mut v = utils::utf16("Consolas");
+		v.resize(LF_FACESIZE, 0);
+		v
+	};
 	static ref CV: Arc<(Mutex<bool>, Condvar)> = Arc::new((Mutex::new(false), Condvar::new()));
+}
+
+#[repr(C)]
+struct CHARRANGE {
+	cpMin: LONG,
+	cpMax: LONG,
+}
+
+#[repr(C)]
+struct CHARFORMAT {
+	cbSize: UINT,
+	dwMask: DWORD,
+	dwEffects: DWORD,
+	yHeight: LONG,
+	yOffset: LONG,
+	crTextColor: COLORREF,
+	bCharSet: BYTE,
+	bPitchAndFamily: BYTE,
+	szFaceName: [WCHAR; LF_FACESIZE],
 }
 
 unsafe extern "system" fn WndProc(hwnd: HWND, message: UINT, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
@@ -86,10 +122,6 @@ fn create_window(instance: HINSTANCE) -> Result<HWND, DWORD> {
 }
 
 fn create_richedit(instance: HINSTANCE, window: HWND) -> Result<HWND, DWORD> {
-	const ES_MULTILINE: DWORD = 0x4;
-	const ES_AUTOVSCROLL: DWORD = 0x40;
-	const ES_READONLY: DWORD = 0x800;
-
 	unsafe {
 		let hwnd_edit = user32::CreateWindowExW(0,
 												utils::utf16("RICHEDIT50W").as_ptr(),
@@ -109,6 +141,17 @@ fn create_richedit(instance: HINSTANCE, window: HWND) -> Result<HWND, DWORD> {
 	}
 }
 
+fn set_font(edit: HWND) {
+	unsafe {
+		let mut cf = mem::zeroed::<CHARFORMAT>();
+		cf.cbSize = mem::size_of::<CHARFORMAT>() as UINT;
+		cf.dwMask = CFM_FACE;
+		ptr::copy(FONT_NAME.as_ptr(), cf.szFaceName.as_mut_ptr(), LF_FACESIZE);
+
+		user32::SendMessageW(edit, EM_SETCHARFORMAT, SCF_DEFAULT, &cf as *const _ as LPARAM);
+	}
+}
+
 fn initialize_window() -> Result<(), String> {
 	try!(load_richedit().map_err(|e| format!("Error loading richedit: {}", e)));
 
@@ -116,6 +159,7 @@ fn initialize_window() -> Result<(), String> {
 	try!(register_class(instance).map_err(|e| format!("Error registering class: {}", e)));
 	let window = try!(create_window(instance).map_err(|e| format!("Error creating window: {}", e)));
 	let edit = try!(create_richedit(instance, window).map_err(|e| format!("Error creating richedit: {}", e)));
+	set_font(edit);
 
 	unsafe {
 		HWND_EDIT = edit;
@@ -169,35 +213,7 @@ fn message_thread() {
 	}
 }
 
-#[repr(C)]
-struct CHARRANGE {
-	cpMin: LONG,
-	cpMax: LONG,
-}
-
-const LF_FACESIZE: usize = 32;
-
-#[repr(C)]
-struct CHARFORMAT {
-	cbSize: UINT,
-	dwMask: DWORD,
-	dwEffects: DWORD,
-	yHeight: LONG,
-	yOffset: LONG,
-	crTextColor: COLORREF,
-	bCharSet: BYTE,
-	bPitchAndFamily: BYTE,
-	szFaceName: [WCHAR; LF_FACESIZE],
-}
-
 pub fn log(record: &LogRecord) {
-	const CFM_COLOR: DWORD = 0x40000000;
-	const CFM_FACE: DWORD = 0x20000000;
-	const EM_EXSETSEL: UINT = WM_USER + 55;
-	const EM_SETCHARFORMAT: UINT = WM_USER + 68;
-	const EM_REPLACESEL: UINT = 0xC2;
-	const SCF_SELECTION: DWORD = 0x1;
-
 	let edit = unsafe { HWND_EDIT };
 	if edit == ptr::null_mut() {
 		return;
@@ -219,7 +235,7 @@ pub fn log(record: &LogRecord) {
 	{
 		let cf = CHARFORMAT {
 			cbSize: mem::size_of::<CHARFORMAT>() as UINT,
-			dwMask: CFM_COLOR | CFM_FACE,
+			dwMask: CFM_COLOR,
 			dwEffects: 0,
 			yHeight: 0,
 			yOffset: 0,
@@ -232,15 +248,7 @@ pub fn log(record: &LogRecord) {
 			},
 			bCharSet: 0,
 			bPitchAndFamily: 0,
-			szFaceName: [(b'C' as u16) << 8,
-			             (b'o' as u16) << 8,
-			             (b'n' as u16) << 8,
-			             (b's' as u16) << 8,
-			             (b'o' as u16) << 8,
-			             (b'l' as u16) << 8,
-			             (b'a' as u16) << 8,
-			             (b's' as u16) << 8,
-						 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+			szFaceName: [0; LF_FACESIZE]
 		};
 
 		unsafe {

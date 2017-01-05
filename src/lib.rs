@@ -57,6 +57,11 @@ pub extern "stdcall" fn DllMain(instance: HINSTANCE, reason: DWORD, _reserved: L
 
 fn initialize() -> Result<(), String> {
 	try!(logger::init().map_err(|e| format!("Error initializing the logger: {}", e)));
+	error!("Error");
+	warn!("Warn");
+	info!("Info");
+	debug!("Debug");
+	trace!("Trace");
 
 	let engine = try!(ModuleInfo::get("engine.dll").ok_or("Could not get engine.dll module info."));
 	let server = try!(ModuleInfo::get("server.dll").ok_or("Could not get server.dll module info."));

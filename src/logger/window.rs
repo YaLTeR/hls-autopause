@@ -241,9 +241,9 @@ pub fn log(record: &LogRecord) {
 			yOffset: 0,
 			crTextColor: match record.level() {
 				LogLevel::Error => RGB(255, 0, 0),
-				LogLevel::Warn => RGB(200, 0, 0),
+				LogLevel::Warn => RGB(180, 0, 0),
 				LogLevel::Info => unsafe { user32::GetSysColor(COLOR_WINDOWTEXT) },
-				LogLevel::Debug => RGB(100, 100, 0),
+				LogLevel::Debug => RGB(120, 120, 0),
 				LogLevel::Trace => unsafe { user32::GetSysColor(COLOR_GRAYTEXT) },
 			},
 			bCharSet: 0,

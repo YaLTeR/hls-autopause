@@ -1,33 +1,17 @@
 use kernel32;
 use log::*;
-use std::{env, mem, ptr, thread};
+use std::{mem, ptr, thread};
 use std::sync::{Arc, Condvar, Mutex};
 use user32;
 use utils;
 use winapi::*;
 
-const DEFAULT_LOG_LEVEL: LogLevelFilter = LogLevelFilter::Debug;
-
 static mut HWND_EDIT: HWND = 0 as HWND;
 
 lazy_static! {
-	static ref LOG_LEVEL_FILTER: LogLevelFilter =
-		env::var("Y_LOGLEVEL").map(|s| string_to_log_level(&s)).unwrap_or(DEFAULT_LOG_LEVEL);
-
 	static ref CLASS_NAME: Vec<u16> = utils::utf16("Debug Console");
 	static ref WINDOW_TITLE: Vec<u16> = utils::utf16("Debug Console");
 	static ref CV: Arc<(Mutex<bool>, Condvar)> = Arc::new((Mutex::new(false), Condvar::new()));
-}
-
-fn string_to_log_level(string: &str) -> LogLevelFilter {
-	match string {
-		x if x == "TRACE" => LogLevelFilter::Trace,
-		x if x == "DEBUG" => LogLevelFilter::Debug,
-		x if x == "INFO" => LogLevelFilter::Info,
-		x if x == "WARN" => LogLevelFilter::Warn,
-		x if x == "ERROR" => LogLevelFilter::Error,
-		_ => DEFAULT_LOG_LEVEL
-	}
 }
 
 unsafe extern "system" fn WndProc(hwnd: HWND, message: UINT, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
@@ -206,7 +190,7 @@ struct CHARFORMAT {
 	szFaceName: [WCHAR; LF_FACESIZE],
 }
 
-fn print_to_debug_console(record: &LogRecord) {
+pub fn log(record: &LogRecord) {
 	const CFM_COLOR: DWORD = 0x40000000;
 	const CFM_FACE: DWORD = 0x20000000;
 	const EM_EXSETSEL: UINT = WM_USER + 55;
@@ -279,43 +263,13 @@ fn print_to_debug_console(record: &LogRecord) {
 	}
 }
 
-struct Logger {
-	_h: (),
-}
+pub fn init() {
+	thread::spawn(message_thread);
 
-impl Logger {
-	fn new() -> Self {
-		thread::spawn(message_thread);
-
-		// Wait till the window is created.
-		let &(ref lock, ref cvar) = &**CV;
-		let mut started = lock.lock().unwrap();
-		while !*started {
-			started = cvar.wait(started).unwrap();
-		}
-
-		Logger {
-			_h: ()
-		}
+	// Wait till the window is created.
+	let &(ref lock, ref cvar) = &**CV;
+	let mut started = lock.lock().unwrap();
+	while !*started {
+		started = cvar.wait(started).unwrap();
 	}
-}
-
-impl Log for Logger {
-	fn enabled(&self, metadata: &LogMetadata) -> bool {
-		metadata.level() <= *LOG_LEVEL_FILTER
-	}
-
-	fn log(&self, record: &LogRecord) {
-		if self.enabled(record.metadata()) {
-			println!("[{}] [{}] {}", record.level(), record.target(), record.args());
-			print_to_debug_console(record);
-		}
-	}
-}
-
-pub fn init() -> Result<(), SetLoggerError> {
-	set_logger(|max_log_level| {
-		max_log_level.set(*LOG_LEVEL_FILTER);
-		Box::new(Logger::new())
-	})
 }

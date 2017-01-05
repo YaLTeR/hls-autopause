@@ -23,8 +23,8 @@ use winapi::*;
 mod macros;
 
 mod hooks {
-	pub mod engine;
-	pub mod server;
+    pub mod engine;
+    pub mod server;
 }
 mod logger;
 mod minhook;
@@ -38,44 +38,44 @@ const DLL_PROCESS_DETACH: DWORD = 0;
 
 #[no_mangle]
 pub extern "stdcall" fn DllMain(instance: HINSTANCE, reason: DWORD, _reserved: LPVOID) -> BOOL {
-	match reason {
-		DLL_PROCESS_ATTACH => {
-			unsafe {
-				kernel32::DisableThreadLibraryCalls(instance);
-			}
+    match reason {
+        DLL_PROCESS_ATTACH => {
+            unsafe {
+                kernel32::DisableThreadLibraryCalls(instance);
+            }
 
-			thread::spawn(main_thread);
-		},
-		DLL_PROCESS_DETACH => {
-			minhook::uninitialize();
-		}
-		_ => {}
-	}
+            thread::spawn(main_thread);
+        }
+        DLL_PROCESS_DETACH => {
+            minhook::uninitialize();
+        }
+        _ => {}
+    }
 
-	TRUE
+    TRUE
 }
 
 fn initialize() -> Result<(), String> {
-	try!(logger::init().map_err(|e| format!("Error initializing the logger: {}", e)));
-	error!("Error");
-	warn!("Warn");
-	info!("Info");
-	debug!("Debug");
-	trace!("Trace");
+    try!(logger::init().map_err(|e| format!("Error initializing the logger: {}", e)));
+    error!("Error");
+    warn!("Warn");
+    info!("Info");
+    debug!("Debug");
+    trace!("Trace");
 
-	let engine = try!(ModuleInfo::get("engine.dll").ok_or("Could not get engine.dll module info."));
-	let server = try!(ModuleInfo::get("server.dll").ok_or("Could not get server.dll module info."));
+    let engine = try!(ModuleInfo::get("engine.dll").ok_or("Could not get engine.dll module info."));
+    let server = try!(ModuleInfo::get("server.dll").ok_or("Could not get server.dll module info."));
 
-	unsafe {
-		try!(hooks::engine::engine.hook(engine));
-		try!(hooks::server::server.hook(server));
-	}
+    unsafe {
+        try!(hooks::engine::engine.hook(engine));
+        try!(hooks::server::server.hook(server));
+    }
 
-	Ok(())
+    Ok(())
 }
 
 fn main_thread() {
-	if let Err(err) = initialize() {
-		utils::msgbox(&err);
-	}
+    if let Err(err) = initialize() {
+        utils::msgbox(&err);
+    }
 }

@@ -22,6 +22,7 @@ use winapi::*;
 #[macro_use]
 mod macros;
 
+mod features;
 mod hooks {
     pub mod engine;
     pub mod server;
@@ -57,18 +58,18 @@ pub extern "stdcall" fn DllMain(instance: HINSTANCE, reason: DWORD, _reserved: L
 
 fn initialize() -> Result<(), String> {
     try!(logger::init().map_err(|e| format!("Error initializing the logger: {}", e)));
-    error!("Error");
-    warn!("Warn");
-    info!("Info");
-    debug!("Debug");
-    trace!("Trace");
+    error!(target: "", "Error");
+    warn!(target: "", "Warn");
+    info!(target: "", "Info");
+    debug!(target: "", "Debug");
+    trace!(target: "", "Trace");
 
-    let engine = try!(ModuleInfo::get("engine.dll").ok_or("Could not get engine.dll module info."));
-    let server = try!(ModuleInfo::get("server.dll").ok_or("Could not get server.dll module info."));
-
-    unsafe {
-        try!(hooks::engine::engine.hook(engine));
-        try!(hooks::server::server.hook(server));
+    if let Some(engine) = ModuleInfo::get("engine.dll") {
+        unsafe { hooks::engine::engine.hook(engine); }
+    }
+    
+    if let Some(server) = ModuleInfo::get("server.dll") {
+        unsafe { hooks::server::server.hook(server); }
     }
 
     Ok(())

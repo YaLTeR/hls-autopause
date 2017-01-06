@@ -40,7 +40,12 @@ impl Log for Logger {
 
     fn log(&self, record: &LogRecord) {
         if self.enabled(record.metadata()) {
-            println!("[{}] [{}] {}", record.level(), record.target(), record.args());
+            if record.target().is_empty() {
+                println!("[{}] {}", record.level(), record.args());
+            } else {
+                println!("[{}] [{}] {}", record.level(), record.target(), record.args());
+            }
+
             window::log(record);
         }
     }

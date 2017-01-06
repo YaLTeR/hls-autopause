@@ -1,3 +1,4 @@
+use features;
 use libc;
 use libc::*;
 use moduleinfo::ModuleInfo;
@@ -24,15 +25,19 @@ hook_struct! {
         pub extern "C" fn Host_Spawn_f(&mut self) {
             Engine::Host_Spawn_f();
 
-            self.next_unpause_is_bad = true;
+            if features::autopause() {
+                self.next_unpause_is_bad = true;
+            }
         }
 
         pub extern "C" fn Host_UnPause_f(&mut self) {
             trace!(target: "engine", "Entering Host_UnPause_f()");
 
-            if self.next_unpause_is_bad {
-                self.next_unpause_is_bad = false;
-                Engine::Cbuf_AddText(cstr!(b"setpause\n\0"));
+            if features::autopause() {
+                if self.next_unpause_is_bad {
+                    self.next_unpause_is_bad = false;
+                    Engine::Cbuf_AddText(cstr!(b"setpause\n\0"));
+                }
             }
 
             Engine::Host_UnPause_f();
@@ -63,50 +68,52 @@ pattern!(ConCommand__ConCommand
 );
 
 impl Engine {
-    pub fn hook(&mut self, module_info: ModuleInfo) -> Result<(), String> {
+    pub fn hook(&mut self, module_info: ModuleInfo) {
         self.module_info = Some(module_info);
         let module_info = self.module_info.as_ref().unwrap();
 
         debug!(target: "engine", "Base: {:p}; size = {}", module_info.base, module_info.size);
 
-        let addr_Cbuf_AddText =
-            try!(module_info.find(Cbuf_AddText).ok_or("Couldn't find Cbuf_AddText()."));
-        let addr_Host_Spawn_f =
-            try!(module_info.find(Host_Spawn_f).ok_or("Couldn't find Host_Spawn_f()."));
-        let addr_Host_UnPause_f =
-            try!(module_info.find(Host_UnPause_f).ok_or("Couldn't find Host_UnPause_f()."));
-        let addr_ConCommand__ConCommand = try!(module_info.find(ConCommand__ConCommand)
-                            .ok_or("Couldn't find ConCommand::ConCommand()."));
-        let addr_CreateInterface = try!(module_info.get_function(cstr!(b"CreateInterface\0"))
-                            .ok_or("Couldn't get the address of CreateInterface()."));
+        let addr_Cbuf_AddText = module_info.find(Cbuf_AddText);
+        let addr_Host_Spawn_f = module_info.find(Host_Spawn_f);
+        let addr_Host_UnPause_f = module_info.find(Host_UnPause_f);
+        let addr_ConCommand__ConCommand = module_info.find(ConCommand__ConCommand);
+        let addr_CreateInterface = module_info.get_function(cstr!(b"CreateInterface\0"));
 
-        debug!(target: "engine", "{:p} - Cbuf_AddText()", addr_Cbuf_AddText);
-        debug!(target: "engine", "{:p} - Host_Spawn_f()", addr_Host_Spawn_f);
-        debug!(target: "engine", "{:p} - Host_UnPause_f()", addr_Host_UnPause_f);
-        debug!(target: "engine", "{:p} - ConCommand::ConCommand()", addr_ConCommand__ConCommand);
-        debug!(target: "engine", "{:p} - CreateInterface()", addr_CreateInterface);
+        print_addrs!("engine",
+            (addr_Cbuf_AddText, "Cbuf_AddText()"),
+            (addr_Host_Spawn_f, "Host_Spawn_f()"),
+            (addr_Host_UnPause_f, "Host_UnPause_f()"),
+            (addr_ConCommand__ConCommand, "ConCommand::ConCommand()"),
+            (addr_CreateInterface, "CreateInterface()")
+        );
 
-        unsafe {
-            self.Cbuf_AddText = mem::transmute(addr_Cbuf_AddText);
-            self.CreateInterface = mem::transmute(addr_CreateInterface);
+        if let Some(addr) = addr_Cbuf_AddText {
+            self.Cbuf_AddText = unsafe { mem::transmute(addr) };
         }
 
-        self.icvar =
-            try!(self.create_interface(VENGINE_CVAR_INTERFACE_VERSION)
-                     .ok_or("Couldn't get the ICVar interface from the engine.")) as *mut ICVar;
-        self.concommand_vtable =
-            unsafe { *((addr_ConCommand__ConCommand as *mut u8).offset(35) as *const *mut c_void) };
-
-        unsafe {
-            self.register_concmd(&mut hello);
+        if let Some(addr) = addr_CreateInterface {
+            self.CreateInterface = unsafe { mem::transmute(addr) };
+            self.icvar = self.create_interface(VENGINE_CVAR_INTERFACE_VERSION)
+                .unwrap_or(0 as *mut c_void) as *mut ICVar;
         }
 
-        hook!(self,
+        if let Some(addr) = addr_ConCommand__ConCommand {
+            self.concommand_vtable = unsafe {
+                *((addr as *mut u8).offset(35) as *const *mut c_void)
+            };
+        }
+
+        hook!("engine", self,
             (addr_Host_Spawn_f, Host_Spawn_f),
             (addr_Host_UnPause_f, Host_UnPause_f)
         );
 
-        Ok(())
+        features::refresh();
+
+        if features::console_commands() {
+            self.register_concmd(unsafe { &mut hello });
+        }
     }
 
     fn create_interface(&self, name: *const c_char) -> Option<*mut c_void> {

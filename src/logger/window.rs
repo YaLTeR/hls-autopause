@@ -8,6 +8,7 @@ use winapi::*;
 
 const CFM_COLOR: DWORD = 0x40000000;
 const CFM_FACE: DWORD = 0x20000000;
+const CFM_SIZE: DWORD = 0x80000000;
 const EM_EXSETSEL: UINT = WM_USER + 55;
 const EM_SETCHARFORMAT: UINT = WM_USER + 68;
 const EM_REPLACESEL: UINT = 0xC2;
@@ -158,7 +159,8 @@ fn set_font(edit: HWND) {
     unsafe {
         let mut cf = mem::zeroed::<CHARFORMAT>();
         cf.cbSize = mem::size_of::<CHARFORMAT>() as UINT;
-        cf.dwMask = CFM_FACE;
+        cf.dwMask = CFM_FACE | CFM_SIZE;
+        cf.yHeight = 220;
         ptr::copy(FONT_NAME.as_ptr(), cf.szFaceName.as_mut_ptr(), LF_FACESIZE);
 
         user32::SendMessageW(edit,
@@ -282,7 +284,11 @@ pub fn log(record: &LogRecord) {
 
     // Put in the text.
     {
-        let text = format!("[{}] {}\n", record.target(), record.args());
+        let text = if record.target().is_empty() {
+            format!("{}\n", record.args())
+        } else {
+            format!("[{}] {}\n", record.target(), record.args())
+        };
 
         unsafe {
             user32::SendMessageW(HWND_EDIT,

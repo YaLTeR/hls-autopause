@@ -36,7 +36,7 @@ macro_rules! hook_struct_impl {
 
     // Function field
     ($name:ident pub $fname:ident : extern $call:tt fn($($arg:ident : $t:ty),*) $(-> $rv:ty)* , $($rest:tt)*) => ( interpolate_idents! {
-        extern $call fn [$fname _default]($(_ : $t),*) $(-> $rv)* {
+        pub extern $call fn [$fname _default]($(_ : $t),*) $(-> $rv)* {
             // This should never be called.
             unsafe {
                 std::intrinsics::breakpoint();
@@ -58,7 +58,7 @@ macro_rules! hook_struct_impl {
 
     // Function
     ($name:ident pub extern $call:tt fn $fname:ident(&mut $s:ident $(, $arg:ident : $t:ty)*) $(-> $rv:ty)* $body:block $($rest:tt)*) => ( interpolate_idents! {
-        extern $call fn [$fname _default]($(_ : $t),*) $(-> $rv)* {
+        pub extern $call fn [$fname _default]($(_ : $t),*) $(-> $rv)* {
             // This should never be called.
             unsafe {
                 std::intrinsics::breakpoint();
@@ -148,25 +148,31 @@ macro_rules! pattern {
 }
 
 macro_rules! hook {
-    ($s:ident, $(($target:expr, $fname:ident)),+) => {{
+    ($target:tt, $s:ident, $(($ftarget:expr, $fname:ident)),+) => {{
         $(
-            try!({ interpolate_idents! {
-                let detour = Self::[$fname _hook];
-                let trampoline = &mut $s.$fname;
+            if let Some(ftarget) = $ftarget {
+                if let Err(err) = { interpolate_idents! {
+                    let detour = Self::[$fname _hook];
+                    let trampoline = &mut $s.$fname;
 
-                // This is needed to cast from function item type to function pointer type.
-                let mut temp = *trampoline;
-                temp = detour;
+                    // This is needed to cast from function item type to function pointer type.
+                    let mut temp = *trampoline;
+                    temp = detour;
 
-                $crate::minhook::create_hook($target, temp, trampoline)
-                    .map_err(|e| format!("Error creating hook: {}", e))
-                    .and($crate::minhook::queue_enable_hook(Some($target))
-                        .map_err(|e| format!("Error adding hook to enable queue: {}", e)))
-            } });
+                    $crate::minhook::create_hook(ftarget, temp, trampoline)
+                        .map_err(|e| format!("Error creating hook: {}", e))
+                        .and($crate::minhook::queue_enable_hook(Some(ftarget))
+                            .map_err(|e| format!("Error adding hook to enable queue: {}", e)))
+                } } {
+                    error!(target: $target, "{}", err);
+                }
+            }
         )*
 
-        try!($crate::minhook::apply_queued()
-            .map_err(|e| format!("Error enabling queued hooks: {}", e)));
+        if let Err(err) = $crate::minhook::apply_queued()
+            .map_err(|e| format!("Error enabling queued hooks: {}", e)) {
+            error!(target: $target, "{}", err);            
+        }
     }}
 }
 
@@ -191,6 +197,41 @@ macro_rules! con_command {
             callback: [$name _callback],
             completion_callback: $crate::hooks::engine::icvar::ConCommand::default_completion_callback,
             has_completion_callback: true,
+        };
+    } )
+}
+
+macro_rules! print_addrs {
+    ($target:tt, $(($addr:expr, $name:tt)),*) => {
+        $(
+            match $addr {
+                Some(addr) => debug!(target: $target, "{:p} - {}", addr, $name),
+                None => warn!(target: $target, "<not found> - {}", $name),
+            };
+        )*
+    }
+}
+
+macro_rules! define_features {
+    ($(($fname:ident, $sname:ident, $text:tt)),*) => ( interpolate_idents! {
+        $(
+            static mut $sname: Feature = Feature {
+                name: $text,
+                enabled: false,
+            };
+
+            #[inline(always)]
+            pub fn $fname() -> bool {
+                unsafe { $sname.enabled }
+            }
+        )*
+
+        static FEATURES: &'static [&'static Feature] = unsafe {
+            &[
+                $(
+                    &$sname
+                ),*
+            ]
         };
     } )
 }

@@ -22,7 +22,7 @@ macro_rules! hook_struct_fields {
     );
 
     // Function
-    ($stype:ident pub extern $call:tt fn $name:ident(&mut $s:ident $(, $arg:ident : $t:ty)*) $(-> $rv:ty)* $body:block $($rest:tt)*) => (
+    ($stype:ident pub extern $call:tt fn $name:ident(&mut $s:ident $(, $arg:ident : $t:ty)*) $(-> $rv:ty)* { $($body:tt)* } $($rest:tt)*) => (
         hook_struct_fields! { $stype $($rest)* F $name { extern $call fn($(arg : $t),*) $(-> $rv)* } }
     );
 }
@@ -57,7 +57,7 @@ macro_rules! hook_struct_impl {
     } );
 
     // Function
-    ($name:ident pub extern $call:tt fn $fname:ident(&mut $s:ident $(, $arg:ident : $t:ty)*) $(-> $rv:ty)* $body:block $($rest:tt)*) => ( interpolate_idents! {
+    ($name:ident pub extern $call:tt fn $fname:ident(&mut $s:ident $(, $arg:ident : $t:ty)*) $(-> $rv:ty)* { $($body:tt)* } $($rest:tt)*) => ( interpolate_idents! {
         pub extern $call fn [$fname _default]($(_ : $t),*) $(-> $rv)* {
             // This should never be called.
             unsafe {
@@ -81,7 +81,9 @@ macro_rules! hook_struct_impl {
             }
         }
 
-        fn [My $fname](&mut $s, $($arg : $t),*) $(-> $rv)* $body
+        fn [My $fname](&mut $s, $($arg : $t),*) $(-> $rv)* {
+            $($body)*
+        }
 
     } hook_struct_impl! { $name $($rest)* } );
 
@@ -112,7 +114,7 @@ macro_rules! hook_struct_init {
     } );
 
     // Function
-    ($stype:ident pub extern $call:tt fn $name:ident(&mut $s:ident $(, $arg:ident : $t:ty)*) $(-> $rv:ty)* $body:block $($rest:tt)*) => ( interpolate_idents! {
+    ($stype:ident pub extern $call:tt fn $name:ident(&mut $s:ident $(, $arg:ident : $t:ty)*) $(-> $rv:ty)* { $($body:tt)* } $($rest:tt)*) => ( interpolate_idents! {
         hook_struct_init! { $stype $($rest)* I $name $stype :: [$name _default] }
     } );
 }

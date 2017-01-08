@@ -15,6 +15,7 @@ libc = "0.2"
 log = "0.3"
 psapi-sys = { git = "https://github.com/retep998/winapi-rs.git", rev = "2d9b5ba" }
 user32-sys = { git = "https://github.com/retep998/winapi-rs.git", rev = "2d9b5ba" }
+widestring = "0.2"
 winapi = { git = "https://github.com/retep998/winapi-rs.git", rev = "2d9b5ba" }
 
 [profile.dev]

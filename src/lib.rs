@@ -14,6 +14,7 @@ extern crate libc;
 extern crate log;
 extern crate psapi;
 extern crate user32;
+extern crate widestring;
 extern crate winapi;
 
 use std::thread;
@@ -25,6 +26,7 @@ mod macros;
 mod features;
 mod hooks {
     pub mod engine;
+    pub mod kernel32;
     pub mod server;
 }
 mod logger;
@@ -63,6 +65,10 @@ fn initialize() -> Result<(), String> {
     info!(target: "", "Info");
     debug!(target: "", "Debug");
     trace!(target: "", "Trace");
+
+    if let Some(kernel32) = ModuleInfo::get("kernel32.dll") {
+        unsafe { hooks::kernel32::k32.hook(kernel32); }
+    }
 
     if let Some(engine) = ModuleInfo::get("engine.dll") {
         unsafe { hooks::engine::engine.hook(engine); }

@@ -38,11 +38,11 @@ impl ModuleInfo {
         None
     }
 
-    pub fn get_function(&self, name: LPCSTR) -> Option<FARPROC> {
+    pub fn get_function(&self, name: LPCSTR) -> Option<LPVOID> {
         unsafe {
             match kernel32::GetProcAddress(self.handle, name) {
                 p if p == ptr::null() => None,
-                p => Some(p),
+                p => Some(p as LPVOID),
             }
         }
     }

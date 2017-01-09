@@ -1,3 +1,4 @@
+use hookable::Hookable;
 use libc;
 use moduleinfo::ModuleInfo;
 use std::{self, ffi};
@@ -7,6 +8,7 @@ use winapi::*;
 hook_struct! {
     k32 = pub struct Kernel32 {
         pub module_info: Option<ModuleInfo> = None,
+        pub hooks: Option<Vec<&'static mut Hookable>> = None,
     }
 
     impl Kernel32 {
@@ -57,9 +59,11 @@ hook_struct! {
 }
 
 impl Kernel32 {
-    pub fn hook(&mut self, module_info: ModuleInfo) {
-        self.module_info = Some(module_info);
+    pub fn hook(&mut self, module_info: &ModuleInfo, hooks: Vec<&'static mut Hookable>) {
+        self.module_info = Some(module_info.clone());
         let module_info = self.module_info.as_ref().unwrap();
+
+        self.hooks = Some(hooks);
 
         debug!(target: "kernel32", "Base: {:p}; size = {}", module_info.base, module_info.size);
 
@@ -84,5 +88,15 @@ impl Kernel32 {
             (addr_LoadLibraryExW, LoadLibraryExW),
             (addr_FreeLibrary, FreeLibrary)
         );
+    }
+
+    pub fn initial_hook(&mut self) {
+        let modules = ModuleInfo::get_loaded();
+
+        for hook in self.hooks.as_mut().unwrap().iter_mut() {
+            if let Some(module) = hook.pick_best_hook_target(&modules) {
+                hook.hook(module);
+            }
+        }
     }
 }

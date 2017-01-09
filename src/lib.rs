@@ -24,6 +24,7 @@ use winapi::*;
 mod macros;
 
 mod features;
+mod hookable;
 mod hooks {
     pub mod engine;
     pub mod kernel32;
@@ -67,15 +68,13 @@ fn initialize() -> Result<(), String> {
     trace!(target: "", "Trace");
 
     if let Some(kernel32) = ModuleInfo::get("kernel32.dll") {
-        unsafe { hooks::kernel32::k32.hook(kernel32); }
-    }
-
-    if let Some(engine) = ModuleInfo::get("engine.dll") {
-        unsafe { hooks::engine::engine.hook(engine); }
-    }
-    
-    if let Some(server) = ModuleInfo::get("server.dll") {
-        unsafe { hooks::server::server.hook(server); }
+        unsafe {
+            hooks::kernel32::k32.hook(&kernel32, vec![
+                &mut hooks::engine::engine,
+                &mut hooks::server::server
+            ]);
+            hooks::kernel32::k32.initial_hook();
+        }
     }
 
     Ok(())

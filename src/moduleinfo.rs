@@ -1,11 +1,11 @@
 use kernel32;
 use pattern;
 use psapi;
-use std::mem;
-use std::ptr;
+use std::{cmp, mem, ptr};
 use utils;
 use winapi::*;
 
+#[derive(Clone, Copy)]
 pub struct ModuleInfo {
     pub handle: HMODULE,
     pub base: LPVOID,
@@ -21,21 +21,31 @@ impl ModuleInfo {
                 return None;
             }
 
-            let mut info = mem::uninitialized::<MODULEINFO>();
-            if psapi::GetModuleInformation(kernel32::GetCurrentProcess(),
-                                           handle,
-                                           &mut info,
-                                           mem::size_of::<MODULEINFO>() as DWORD) !=
-               0 {
-                return Some(ModuleInfo {
-                    handle: handle,
-                    base: info.lpBaseOfDll,
-                    size: info.SizeOfImage as usize,
-                });
+            utils::get_module_info(handle)
+        }
+    }
+
+    pub fn get_loaded() -> Vec<ModuleInfo> {
+        unsafe {
+            let mut modules: [HMODULE; 1024] = mem::uninitialized();
+            let mut size_needed: DWORD = mem::uninitialized();
+
+            if psapi::EnumProcessModules(kernel32::GetCurrentProcess(),
+                                         modules.as_mut_ptr(),
+                                         mem::size_of_val(&modules) as DWORD,
+                                         &mut size_needed) != 0 {
+                let module_count = cmp::min(1024usize,
+                                            size_needed as usize / mem::size_of::<HMODULE>());
+
+                modules.into_iter()
+                       .cloned()
+                       .take(module_count)
+                       .filter_map(utils::get_module_info)
+                       .collect()
+            } else {
+                Vec::new()
             }
         }
-
-        None
     }
 
     pub fn get_function(&self, name: LPCSTR) -> Option<LPVOID> {

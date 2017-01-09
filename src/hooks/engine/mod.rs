@@ -1,10 +1,9 @@
 use features;
+use hookable::*;
 use libc;
 use libc::*;
 use moduleinfo::ModuleInfo;
-use std;
-use std::mem;
-use std::ptr;
+use std::{self, mem, ptr};
 
 pub mod icvar;
 use self::icvar::*;
@@ -12,6 +11,7 @@ use self::icvar::*;
 hook_struct! {
     engine = pub struct Engine {
         pub module_info: Option<ModuleInfo> = None,
+        pub current_name_index: Option<usize> = None,
 
         pub next_unpause_is_bad: bool = false,
         pub Cbuf_AddText: extern "C" fn(text: *const c_char),
@@ -67,10 +67,12 @@ pattern!(ConCommand__ConCommand
     0x8B 0x44 0x24 0x08 0x33 0xD2 0x56 0x8B 0xF1 0x89 0x46 0x18 0x8B 0x44 0x24 0x18 0x3B 0xC2 0x88 0x56 0x08 0x89 0x56 0x0C 0x89 0x56 0x10 0x89 0x56 0x14 0x89 0x56 0x04 0xC7 0x06
 );
 
-impl Engine {
-    pub fn hook(&mut self, module_info: ModuleInfo) {
-        self.module_info = Some(module_info);
+impl Hookable for Engine {
+    fn hook(&mut self, module_info: &ModuleInfo) {
+        self.module_info = Some(module_info.clone());
         let module_info = self.module_info.as_ref().unwrap();
+
+        self.current_name_index = self.compute_current_name_index(module_info);
 
         debug!(target: "engine", "Base: {:p}; size = {}", module_info.base, module_info.size);
 
@@ -115,7 +117,20 @@ impl Engine {
             self.register_concmd(unsafe { &mut hello });
         }
     }
+}
 
+impl HookableOrderedNameFilter for Engine {
+    fn get_current_name_index(&self) -> Option<usize> {
+        self.current_name_index
+    }
+
+    fn get_names(&self) -> &[&'static str] {
+        const NAMES: &'static [&'static str] = &[ "engine.dll" ];
+        NAMES
+    }
+}
+
+impl Engine {
     fn create_interface(&self, name: *const c_char) -> Option<*mut c_void> {
         match (self.CreateInterface)(name, ptr::null_mut()) {
             p if p == ptr::null_mut() => None,

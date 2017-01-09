@@ -1,4 +1,5 @@
 use features;
+use hookable::*;
 use libc::*;
 use moduleinfo::ModuleInfo;
 use std;
@@ -6,6 +7,7 @@ use std;
 hook_struct! {
     server = pub struct Server {
         pub module_info: Option<ModuleInfo> = None,
+        pub current_name_index: Option<usize> = None,
 
         pub jumped_last_tick: bool = false,
         pub inside_checkjumpbutton: bool = false,
@@ -71,10 +73,12 @@ pattern!(CGameMovement__FinishGravity
     0x8B 0x51 0x08 0xD9 0x82 0xB0 0x0B 0x00 0x00 0xD8 0x1D ?? ?? ?? ?? 0xDF 0xE0 0xF6 0xC4 0x44 0x7A 0x4D 0xD9 0x82 0x08 0x02 0x00 0x00 0xD8 0x1D
 );
 
-impl Server {
-    pub fn hook(&mut self, module_info: ModuleInfo) {
-        self.module_info = Some(module_info);
+impl Hookable for Server {
+    fn hook(&mut self, module_info: &ModuleInfo) {
+        self.module_info = Some(module_info.clone());
         let module_info = self.module_info.as_ref().unwrap();
+
+        self.current_name_index = self.compute_current_name_index(module_info);
 
         debug!(target: "server", "Base: {:p}; size = {}", module_info.base, module_info.size);
 
@@ -93,5 +97,16 @@ impl Server {
         );
 
         features::refresh();
+    }
+}
+
+impl HookableOrderedNameFilter for Server {
+    fn get_current_name_index(&self) -> Option<usize> {
+        self.current_name_index
+    }
+
+    fn get_names(&self) -> &[&'static str] {
+        const NAMES: &'static [&'static str] = &[ "server.dll" ];
+        NAMES
     }
 }

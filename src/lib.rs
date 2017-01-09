@@ -17,7 +17,7 @@ extern crate user32;
 extern crate widestring;
 extern crate winapi;
 
-use std::thread;
+use std::{ptr, thread};
 use winapi::*;
 
 #[macro_use]
@@ -59,6 +59,21 @@ pub extern "stdcall" fn DllMain(instance: HINSTANCE, reason: DWORD, _reserved: L
     TRUE
 }
 
+fn tell_injector_to_resume_process() {
+    const EVENT_MODIFY_STATE: DWORD = 0x2;
+    let event_name = utils::utf16("BunnymodXT-Injector");
+
+    unsafe {
+        let event = kernel32::OpenEventW(EVENT_MODIFY_STATE, FALSE, event_name.as_ptr());
+        if event != ptr::null_mut() {
+            kernel32::SetEvent(event);
+            kernel32::CloseHandle(event);
+            
+            debug!(target: "", "Signaled the injector to resume the process.");
+        }
+    }
+}
+
 fn initialize() -> Result<(), String> {
     try!(logger::init().map_err(|e| format!("Error initializing the logger: {}", e)));
     error!(target: "", "Error");
@@ -76,6 +91,8 @@ fn initialize() -> Result<(), String> {
             hooks::kernel32::k32.initial_hook();
         }
     }
+
+    tell_injector_to_resume_process();
 
     Ok(())
 }

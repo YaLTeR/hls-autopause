@@ -73,7 +73,9 @@ impl<T> HookableFilter for T where T: HookableOrderedNameFilter {
         }).collect::<Vec<(&ModuleInfo, String)>>();
 
         for name in self.get_names() {
-            if let Some(module) = modules.iter().filter(|&&(_, ref filename)| name == filename).next() {
+            if let Some(module) = modules.iter()
+                                         .filter(|&&(_, ref filename)| name == filename)
+                                         .next() {
                 return Some(module.0);
             }
         }

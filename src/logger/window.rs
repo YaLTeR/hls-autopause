@@ -1,6 +1,7 @@
 use kernel32;
 use log::*;
 use std::{mem, ptr, thread};
+use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, Condvar, Mutex};
 use user32;
 use utils;
@@ -19,7 +20,23 @@ const LF_FACESIZE: usize = 32;
 const SCF_DEFAULT: DWORD = 0x0;
 const SCF_SELECTION: DWORD = 0x1;
 
-static mut HWND_EDIT: HWND = 0 as HWND;
+struct SendHwnd(HWND);
+
+unsafe impl Send for SendHwnd {}
+
+impl Deref for SendHwnd {
+    type Target = HWND;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for SendHwnd {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
 
 lazy_static! {
     static ref CLASS_NAME: Vec<u16> = utils::utf16("Debug Console");
@@ -30,6 +47,7 @@ lazy_static! {
         v
     };
     static ref CV: Arc<(Mutex<bool>, Condvar)> = Arc::new((Mutex::new(false), Condvar::new()));
+    static ref HWND_EDIT: Mutex<SendHwnd> = Mutex::new(SendHwnd(0 as HWND));
 }
 
 #[repr(C)]
@@ -60,7 +78,7 @@ unsafe extern "system" fn WndProc(hwnd: HWND,
         x if x == WM_SIZE => {
             let w = LOWORD(lparam as u32);
             let h = HIWORD(lparam as u32);
-            user32::SetWindowPos(HWND_EDIT, ptr::null_mut(), 0, 0, w as i32, h as i32, 0);
+            user32::SetWindowPos(**HWND_EDIT.lock().unwrap(), ptr::null_mut(), 0, 0, w as i32, h as i32, 0);
             0
         }
 
@@ -184,7 +202,7 @@ fn initialize_window() -> Result<(), String> {
     set_font(edit);
 
     unsafe {
-        HWND_EDIT = edit;
+        **HWND_EDIT.lock().unwrap() = edit;
 
         user32::ShowWindow(window, SW_SHOWNORMAL);
         user32::ShowWindow(window, SW_SHOWMINNOACTIVE);
@@ -232,12 +250,13 @@ fn message_thread() {
         }
 
         // The window was closed, clear the edit HWND.
-        HWND_EDIT = ptr::null_mut();
+        **HWND_EDIT.lock().unwrap() = ptr::null_mut();
     }
 }
 
 pub fn log(record: &LogRecord) {
-    let edit = unsafe { HWND_EDIT };
+    let edit_guard = HWND_EDIT.lock().unwrap();
+    let edit = **edit_guard;
     if edit == ptr::null_mut() {
         return;
     }
@@ -250,7 +269,7 @@ pub fn log(record: &LogRecord) {
         };
 
         unsafe {
-            user32::SendMessageW(HWND_EDIT, EM_EXSETSEL, 0, &cr as *const _ as LPARAM);
+            user32::SendMessageW(edit, EM_EXSETSEL, 0, &cr as *const _ as LPARAM);
         }
     }
 
@@ -275,7 +294,7 @@ pub fn log(record: &LogRecord) {
         };
 
         unsafe {
-            user32::SendMessageW(HWND_EDIT,
+            user32::SendMessageW(edit,
                                  EM_SETCHARFORMAT,
                                  SCF_SELECTION,
                                  &cf as *const _ as LPARAM);
@@ -291,7 +310,7 @@ pub fn log(record: &LogRecord) {
         };
 
         unsafe {
-            user32::SendMessageW(HWND_EDIT,
+            user32::SendMessageW(edit,
                                  EM_REPLACESEL,
                                  0,
                                  utils::utf16(&text).as_ptr() as LPARAM);
@@ -300,7 +319,7 @@ pub fn log(record: &LogRecord) {
 
     // Scroll the rich edit to the bottom.
     unsafe {
-        user32::SendMessageW(HWND_EDIT, WM_VSCROLL, SB_BOTTOM as WPARAM, 0);
+        user32::SendMessageW(edit, WM_VSCROLL, SB_BOTTOM as WPARAM, 0);
     }
 }
 

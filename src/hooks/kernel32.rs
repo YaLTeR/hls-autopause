@@ -115,7 +115,10 @@ impl Kernel32 {
         if let Some(module) = utils::get_module_info(handle) {
             for hook in self.hooks.as_mut().unwrap().iter_mut() {
                 if hook.should_hook(&module) {
-                    hook.unhook();
+                    if hook.module_info().is_some() {
+                        hook.unhook();
+                    }
+                    
                     hook.hook(&module);
                 }
             }

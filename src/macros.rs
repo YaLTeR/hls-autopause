@@ -125,6 +125,11 @@ macro_rules! hook_struct {
 
         impl $stype {
             hook_struct_impl! { $name $($fields)* $($fns)* }
+
+            #[allow(dead_code)]
+            fn clear(&mut self) {
+                *self = hook_struct_init! { $stype $($fields)* $($fns)* };
+            }
         }
 
         pub static mut $name: $stype = hook_struct_init! { $stype $($fields)* $($fns)* };
@@ -176,6 +181,37 @@ macro_rules! hook {
             error!(target: $target, "{}", err);            
         }
     }}
+}
+
+macro_rules! unhook {
+    ($target:tt, $s:ident, $($fname:ident),+) => {{ interpolate_idents! {
+        $(
+            if $s.$fname as *const () != Self::[$fname _default] as *const () {
+                if let Err(err) = {
+                    $crate::minhook::queue_disable_hook(Some($s.$fname as winapi::LPVOID))
+                            .map_err(|e| format!("Error adding hook to disable queue: {}", e))
+                } {
+                    error!(target: $target, "{}", err);
+                }
+            }
+        )*
+
+        if let Err(err) = $crate::minhook::apply_queued()
+            .map_err(|e| format!("Error disabling queued hooks: {}", e)) {
+            error!(target: $target, "{}", err);            
+        }
+
+        $(
+            if $s.$fname as *const () != Self::[$fname _default] as *const () {
+                if let Err(err) = {
+                    $crate::minhook::remove_hook(Some($s.$fname as winapi::LPVOID))
+                            .map_err(|e| format!("Error removing hook: {}", e))
+                } {
+                    error!(target: $target, "{}", err);
+                }
+            }
+        )*
+    } }}
 }
 
 macro_rules! cstr {

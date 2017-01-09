@@ -8,6 +8,7 @@ pub trait HookableFilter {
 
 pub trait Hookable : HookableFilter {
     fn hook(&mut self, module_info: &ModuleInfo);
+    fn unhook(&mut self);
 }
 
 pub trait HookableOrderedNameFilter : HookableFilter {

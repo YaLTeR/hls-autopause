@@ -4,6 +4,7 @@ use libc;
 use libc::*;
 use moduleinfo::ModuleInfo;
 use std::{self, mem, ptr};
+use winapi;
 
 pub mod icvar;
 use self::icvar::*;
@@ -116,6 +117,17 @@ impl Hookable for Engine {
         if features::console_commands() {
             self.register_concmd(unsafe { &mut hello });
         }
+    }
+
+    fn unhook(&mut self) {
+        unhook!("server", self,
+            Host_Spawn_f,
+            Host_UnPause_f
+        );
+
+        self.clear();
+        
+        features::refresh();
     }
 }
 

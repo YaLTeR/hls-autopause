@@ -3,6 +3,7 @@ use hookable::*;
 use libc::*;
 use moduleinfo::ModuleInfo;
 use std;
+use winapi;
 
 hook_struct! {
     server = pub struct Server {
@@ -95,6 +96,17 @@ impl Hookable for Server {
             (addr_CHL1GameMovement__CheckJumpButton, CHL1GameMovement__CheckJumpButton),
             (addr_CGameMovement__FinishGravity, CGameMovement__FinishGravity)
         );
+
+        features::refresh();
+    }
+
+    fn unhook(&mut self) {
+        unhook!("server", self,
+            CHL1GameMovement__CheckJumpButton,
+            CGameMovement__FinishGravity
+        );
+
+        self.clear();
 
         features::refresh();
     }

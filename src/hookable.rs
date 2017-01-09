@@ -7,6 +7,7 @@ pub trait HookableFilter {
 }
 
 pub trait Hookable : HookableFilter {
+    fn module_info(&self) -> Option<&ModuleInfo>;
     fn hook(&mut self, module_info: &ModuleInfo);
     fn unhook(&mut self);
 }

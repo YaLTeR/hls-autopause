@@ -2,6 +2,7 @@ use hookable::Hookable;
 use libc;
 use moduleinfo::ModuleInfo;
 use std::{self, ffi};
+use utils;
 use widestring::WideCStr;
 use winapi::*;
 
@@ -18,6 +19,8 @@ hook_struct! {
             let filename = unsafe { ffi::CStr::from_ptr(lpFileName).to_string_lossy() };
             trace!(target: "kernel32", "LoadLibraryA(\"{}\") -> {:p}", filename, rv);
 
+            self.hook_module(rv);
+
             rv
         }
 
@@ -26,6 +29,8 @@ hook_struct! {
 
             let filename = unsafe { WideCStr::from_ptr_str(lpFileName).to_string_lossy() };
             trace!(target: "kernel32", "LoadLibraryW(\"{}\") -> {:p}", filename, rv);
+
+            self.hook_module(rv);
 
             rv
         }
@@ -36,6 +41,8 @@ hook_struct! {
             let filename = unsafe { ffi::CStr::from_ptr(lpFileName).to_string_lossy() };
             trace!(target: "kernel32", "LoadLibraryExA(\"{}\") -> {:p}", filename, rv);
 
+            self.hook_module(rv);
+
             rv
         }
 
@@ -45,10 +52,14 @@ hook_struct! {
             let filename = unsafe { WideCStr::from_ptr_str(lpFileName).to_string_lossy() };
             trace!(target: "kernel32", "LoadLibraryExW(\"{}\") -> {:p}", filename, rv);
 
+            self.hook_module(rv);
+
             rv
         }
 
         pub extern "system" fn FreeLibrary(&mut self, hModule: HMODULE) -> BOOL {
+            self.unhook_module(hModule);
+
             let rv = Kernel32::FreeLibrary(hModule);
 
             trace!(target: "kernel32", "FreeLibrary({:p}) -> {}", hModule, rv);
@@ -96,6 +107,27 @@ impl Kernel32 {
         for hook in self.hooks.as_mut().unwrap().iter_mut() {
             if let Some(module) = hook.pick_best_hook_target(&modules) {
                 hook.hook(module);
+            }
+        }
+    }
+
+    fn hook_module(&mut self, handle: HMODULE) {
+        if let Some(module) = utils::get_module_info(handle) {
+            for hook in self.hooks.as_mut().unwrap().iter_mut() {
+                if hook.should_hook(&module) {
+                    hook.unhook();
+                    hook.hook(&module);
+                }
+            }
+        }
+    }
+
+    fn unhook_module(&mut self, handle: HMODULE) {
+        for hook in self.hooks.as_mut().unwrap().iter_mut() {
+            if hook.module_info().is_some() {
+                if hook.module_info().unwrap().handle == handle {
+                    hook.unhook();
+                }
             }
         }
     }

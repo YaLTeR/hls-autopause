@@ -2,11 +2,10 @@ extern crate libc;
 extern crate winapi;
 extern crate user32;
 
-use std::error;
+use std::collections::HashMap;
+use std::{error, fmt, ptr, result};
 use std::ffi::CStr;
-use std::fmt;
-use std::ptr;
-use std::result;
+use std::sync::RwLock;
 use winapi::*;
 
 #[allow(non_camel_case_types)]
@@ -98,6 +97,8 @@ lazy_static! {
             err => Err(MinHookError::new(err))
         }
     };
+
+    static ref trampoline_to_target: RwLock<HashMap<usize, usize>> = RwLock::new(HashMap::new());
 }
 
 pub fn uninitialize() {
@@ -119,7 +120,14 @@ pub fn create_hook<F: Copy>(target: LPVOID, detour: F, trampoline: &mut F) -> Re
         let detour = *(trampoline as *const _ as *const LPVOID);
 
         match MH_CreateHook(target, detour, trampoline as *mut _ as *mut LPVOID) {
-            MH_OK => Ok(()),
+            MH_OK => {
+                trampoline_to_target.write()
+                                    .unwrap()
+                                    .insert(*(trampoline as *const _ as *const usize),
+                                            target as usize);
+
+                Ok(())
+            },
             err => {
                 *trampoline = temp;
                 Err(Error::OperationError(MinHookError::new(err)))
@@ -128,12 +136,21 @@ pub fn create_hook<F: Copy>(target: LPVOID, detour: F, trampoline: &mut F) -> Re
     }
 }
 
-pub fn remove_hook(target: Option<LPVOID>) -> Result<'static, ()> {
+pub fn remove_hook(trampoline: Option<LPVOID>) -> Result<'static, ()> {
     if let Err(ref err) = *mh_init_result {
         return Err(Error::InitError(err));
     }
 
-    let target = target.unwrap_or(ptr::null_mut());
+    let target = match trampoline {
+        Some(addr) => {
+            trampoline_to_target.write()
+                                .unwrap()
+                                .remove(&(addr as usize))
+                                .map(|t| t as LPVOID)
+                                .unwrap_or(ptr::null_mut())
+        },
+        None => ptr::null_mut()
+    };
 
     unsafe {
         match MH_RemoveHook(target) {
@@ -158,12 +175,21 @@ pub fn queue_enable_hook(target: Option<LPVOID>) -> Result<'static, ()> {
     }
 }
 
-pub fn queue_disable_hook(target: Option<LPVOID>) -> Result<'static, ()> {
+pub fn queue_disable_hook(trampoline: Option<LPVOID>) -> Result<'static, ()> {
     if let Err(ref err) = *mh_init_result {
         return Err(Error::InitError(err));
     }
 
-    let target = target.unwrap_or(ptr::null_mut());
+    let target = match trampoline {
+        Some(addr) => {
+            trampoline_to_target.read()
+                                .unwrap()
+                                .get(&(addr as usize))
+                                .map(|&t| t as LPVOID)
+                                .unwrap_or(ptr::null_mut())
+        },
+        None => ptr::null_mut()
+    };
 
     unsafe {
         match MH_QueueDisableHook(target) {

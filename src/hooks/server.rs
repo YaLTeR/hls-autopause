@@ -75,6 +75,10 @@ pattern!(CGameMovement__FinishGravity
 );
 
 impl Hookable for Server {
+    fn module_info(&self) -> Option<&ModuleInfo> {
+        self.module_info.as_ref()
+    }
+
     fn hook(&mut self, module_info: &ModuleInfo) {
         self.module_info = Some(module_info.clone());
         let module_info = self.module_info.as_ref().unwrap();

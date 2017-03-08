@@ -68,7 +68,7 @@ fn tell_injector_to_resume_process() {
         if event != ptr::null_mut() {
             kernel32::SetEvent(event);
             kernel32::CloseHandle(event);
-            
+
             debug!(target: "", "Signaled the injector to resume the process.");
         }
     }

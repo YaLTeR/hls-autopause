@@ -55,7 +55,7 @@ impl<T> HookableFilter for T where T: HookableOrderedNameFilter {
                 .collect::<Vec<&'static str>>(),
             None => self.get_names().iter().cloned().collect::<Vec<&'static str>>()
         };
-        
+
         names_to_check.iter().find(|&name| name == &filename).is_some()
     }
 

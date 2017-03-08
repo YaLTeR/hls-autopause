@@ -118,7 +118,7 @@ impl Kernel32 {
                     if hook.module_info().is_some() {
                         hook.unhook();
                     }
-                    
+
                     hook.hook(&module);
                 }
             }

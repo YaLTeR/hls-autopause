@@ -22,7 +22,7 @@ hook_struct! {
 
             let mut orig_oldbuttons = 0;
             let mut oldbuttons = 0 as *mut c_int;
-            
+
             if features::autojump() {
                 let mv = unsafe { *((this as *mut u8).offset(self.off_mv) as *mut *mut u8) };
                 oldbuttons = unsafe { mv.offset(self.off_oldbuttons) as *mut c_int };

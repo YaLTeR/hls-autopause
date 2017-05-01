@@ -24,6 +24,7 @@ use winapi::*;
 mod macros;
 
 mod features;
+mod function;
 mod hookable;
 mod hooks {
     pub mod engine;
@@ -63,14 +64,14 @@ fn tell_injector_to_resume_process() {
     const EVENT_MODIFY_STATE: DWORD = 0x2;
     let event_name = utils::utf16("BunnymodXT-Injector");
 
-    unsafe {
-        let event = kernel32::OpenEventW(EVENT_MODIFY_STATE, FALSE, event_name.as_ptr());
-        if event != ptr::null_mut() {
+    let event = unsafe { kernel32::OpenEventW(EVENT_MODIFY_STATE, FALSE, event_name.as_ptr()) };
+    if event != ptr::null_mut() {
+        unsafe {
             kernel32::SetEvent(event);
             kernel32::CloseHandle(event);
-
-            debug!(target: "", "Signaled the injector to resume the process.");
         }
+
+        debug!(target: "", "Signaled the injector to resume the process.");
     }
 }
 
@@ -83,13 +84,8 @@ fn initialize() -> Result<(), String> {
     trace!(target: "", "Trace");
 
     if let Some(kernel32) = ModuleInfo::get("kernel32.dll") {
-        unsafe {
-            hooks::kernel32::k32.hook(&kernel32, vec![
-                &mut hooks::engine::engine,
-                &mut hooks::server::server
-            ]);
-            hooks::kernel32::k32.initial_hook();
-        }
+        hooks::kernel32::MODULE.write().unwrap().hook(&kernel32);
+        hooks::kernel32::Kernel32::initial_hook();
     }
 
     tell_injector_to_resume_process();

@@ -1,51 +1,73 @@
 use features;
+use function::Function;
 use hookable::*;
 use libc::*;
 use moduleinfo::ModuleInfo;
-use std;
+use std::sync::RwLock;
 use winapi;
 
-hook_struct! {
-    server = pub struct Server {
-        pub module_info: Option<ModuleInfo> = None,
-        pub current_name_index: Option<usize> = None,
+lazy_static! {
+    pub static ref MODULE: RwLock<ServerModule> = RwLock::new(ServerModule::default());
+    static ref DATA: RwLock<Data> = RwLock::new(Data::default());
+}
 
-        pub jumped_last_tick: bool = false,
-        pub inside_checkjumpbutton: bool = false,
-        pub off_mv: isize = 4,
-        pub off_oldbuttons: isize = 40,
+#[derive(Default)]
+struct Data {
+    jumped_last_tick: bool,
+    inside_checkjumpbutton: bool,
+}
+
+#[derive(Default)]
+pub struct ServerModule {
+    module_info: Option<ModuleInfo>,
+    current_name_index: Option<usize>,
+}
+
+hook_struct! {
+    #[derive(Default)]
+    pub struct Server {
+        pub off_mv: isize,
+        pub off_oldbuttons: isize,
     }
 
     impl Server {
-        pub extern "fastcall" fn CHL1GameMovement__CheckJumpButton(&mut self, this: *mut c_void) {
+        pub extern "fastcall" fn CHL1GameMovement__CheckJumpButton(this: *mut c_void) {
+            let mut server = DATA.write().unwrap();
+
             const IN_JUMP: c_int = 1 << 1;
 
             let mut orig_oldbuttons = 0;
             let mut oldbuttons = 0 as *mut c_int;
 
             if features::autojump() {
-                let mv = unsafe { *((this as *mut u8).offset(self.off_mv) as *mut *mut u8) };
-                oldbuttons = unsafe { mv.offset(self.off_oldbuttons) as *mut c_int };
+                let pointers = POINTERS.read().unwrap();
+
+                let mv = unsafe { *((this as *mut u8).offset(pointers.off_mv) as *mut *mut u8) };
+                oldbuttons = unsafe { mv.offset(pointers.off_oldbuttons) as *mut c_int };
                 orig_oldbuttons = unsafe { *oldbuttons };
 
                 // If we jumped last tick we can't jump this tick
                 // (since this would be the -jump tick).
-                if !self.jumped_last_tick {
+                if !server.jumped_last_tick {
                     // Make the game think jump wasn't pressed last tick.
                     unsafe {
                         *oldbuttons &= !IN_JUMP;
                     }
                 }
 
-                self.jumped_last_tick = false;
+                server.jumped_last_tick = false;
             }
 
-            self.inside_checkjumpbutton = true;
+            server.inside_checkjumpbutton = true;
+
+            drop(server);
             Server::CHL1GameMovement__CheckJumpButton(this);
-            self.inside_checkjumpbutton = false;
+            server = DATA.write().unwrap();
+
+            server.inside_checkjumpbutton = false;
 
             if features::autojump() {
-                if !self.jumped_last_tick {
+                if !server.jumped_last_tick {
                     // We didn't jump this tick, restore the original jump button state.
                     unsafe {
                         *oldbuttons = orig_oldbuttons;
@@ -54,10 +76,12 @@ hook_struct! {
             }
         }
 
-        pub extern "fastcall" fn CGameMovement__FinishGravity(&mut self, this: *mut c_void) {
+        pub extern "fastcall" fn CGameMovement__FinishGravity(this: *mut c_void) {
             if features::autojump() {
-                if self.inside_checkjumpbutton {
-                    self.jumped_last_tick = true;
+                let mut server = DATA.write().unwrap();
+
+                if server.inside_checkjumpbutton {
+                    server.jumped_last_tick = true;
                 }
             }
 
@@ -74,14 +98,13 @@ pattern!(CGameMovement__FinishGravity
     0x8B 0x51 0x08 0xD9 0x82 0xB0 0x0B 0x00 0x00 0xD8 0x1D ?? ?? ?? ?? 0xDF 0xE0 0xF6 0xC4 0x44 0x7A 0x4D 0xD9 0x82 0x08 0x02 0x00 0x00 0xD8 0x1D
 );
 
-impl Hookable for Server {
+impl Hookable for ServerModule {
     fn module_info(&self) -> Option<&ModuleInfo> {
         self.module_info.as_ref()
     }
 
     fn hook(&mut self, module_info: &ModuleInfo) {
         self.module_info = Some(module_info.clone());
-        let module_info = self.module_info.as_ref().unwrap();
 
         self.current_name_index = self.compute_current_name_index(module_info);
 
@@ -96,27 +119,32 @@ impl Hookable for Server {
             (addr_CGameMovement__FinishGravity, "CGameMovement::FinishGravity()")
         );
 
-        hook!("server", self,
+        let mut pointers = POINTERS.write().unwrap();
+
+        pointers.off_mv = 4;
+        pointers.off_oldbuttons = 40;
+
+        hook!("server", Server, pointers,
             (addr_CHL1GameMovement__CheckJumpButton, CHL1GameMovement__CheckJumpButton),
             (addr_CGameMovement__FinishGravity, CGameMovement__FinishGravity)
         );
-
-        features::refresh();
     }
 
     fn unhook(&mut self) {
-        unhook!("server", self,
+        let mut pointers = POINTERS.write().unwrap();
+
+        unhook!("server", pointers,
             CHL1GameMovement__CheckJumpButton,
             CGameMovement__FinishGravity
         );
 
-        self.clear();
-
-        features::refresh();
+        *DATA.write().unwrap() = Data::default();
+        *pointers = Server::default();
+        *self = Self::default();
     }
 }
 
-impl HookableOrderedNameFilter for Server {
+impl HookableOrderedNameFilter for ServerModule {
     fn get_current_name_index(&self) -> Option<usize> {
         self.current_name_index
     }

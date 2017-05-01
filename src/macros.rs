@@ -1,5 +1,6 @@
 macro_rules! hook_struct_declare {
     ($stype:ident $(F $fname:ident { $($ftype:tt)* })*) => (
+        #[derive(Default)]
         pub struct $stype {
             $(pub $fname : $($ftype)*),*
         }
@@ -12,127 +13,118 @@ macro_rules! hook_struct_fields {
     );
 
     // Field
-    ($stype:ident pub $name:ident : $t:ty = $init:expr , $($rest:tt)*) => (
+    ($stype:ident pub $name:ident : $t:ty, $($rest:tt)*) => (
         hook_struct_fields! { $stype $($rest)* F $name { $t } }
     );
 
-    // Function field
-    ($stype:ident pub $name:ident : extern $call:tt fn($($arg:ident : $t:ty),*) $(-> $rv:ty)* , $($rest:tt)*) => (
-        hook_struct_fields! { $stype $($rest)* F $name { extern $call fn($($arg : $t),*) $(-> $rv)* } }
-    );
-
     // Function
-    ($stype:ident pub extern $call:tt fn $name:ident(&mut $s:ident $(, $arg:ident : $t:ty)*) $(-> $rv:ty)* { $($body:tt)* } $($rest:tt)*) => (
-        hook_struct_fields! { $stype $($rest)* F $name { extern $call fn($(arg : $t),*) $(-> $rv)* } }
+    ($stype:ident pub extern $call:tt fn $name:ident($($arg:ident : $t:ty),*) $(-> $rv:ty)* { $($body:tt)* } $($rest:tt)*) => (
+        hook_struct_fields! { $stype $($rest)* F $name { Function<extern $call fn($($t),*) $(-> $rv)*> } }
     );
 }
 
 macro_rules! hook_struct_impl {
-    // Field
-    ($name:ident pub $fname:ident : $t:ty = $init:expr , $($rest:tt)*) => (
-        // We don't care about these here.
-        hook_struct_impl! { $name $($rest)* }
-    );
-
     // Function field
-    ($name:ident pub $fname:ident : extern $call:tt fn($($arg:ident : $t:ty),*) $(-> $rv:ty)* , $($rest:tt)*) => ( interpolate_idents! {
-        pub extern $call fn [$fname _default]($(_ : $t),*) $(-> $rv)* {
-            // This should never be called.
-            unsafe {
-                std::intrinsics::breakpoint();
-            }
-
-            unreachable!();
-        }
-
+    (pub $fname:ident : Function<extern $call:tt fn($($arg:ident : $t:ty),*) $(-> $rv:ty)*> , $($rest:tt)*) => ( interpolate_idents! {
         #[allow(dead_code)]
         #[inline(always)]
         pub fn $fname($($arg : $t),*) $(-> $rv)* {
-            unsafe {
-                ($name.$fname)($($arg),*)
-            }
+            let f = POINTERS.read().unwrap().$fname;
+            f.call($($arg),*)
         }
 
-        hook_struct_impl! { $name $($rest)* }
+        hook_struct_impl! { $($rest)* }
     } );
 
+    // Field
+    (pub $fname:ident : $t:ty, $($rest:tt)*) => (
+        // We don't care about these here.
+        hook_struct_impl! { $($rest)* }
+    );
+
     // Function
-    ($name:ident pub extern $call:tt fn $fname:ident(&mut $s:ident $(, $arg:ident : $t:ty)*) $(-> $rv:ty)* { $($body:tt)* } $($rest:tt)*) => ( interpolate_idents! {
-        pub extern $call fn [$fname _default]($(_ : $t),*) $(-> $rv)* {
-            // This should never be called.
-            unsafe {
-                std::intrinsics::breakpoint();
-            }
-
-            unreachable!();
-        }
-
-        pub extern $call fn [$fname _hook]($($arg : $t),*) $(-> $rv)* {
-            unsafe {
-                $name.[My $fname]($($arg),*)
-            }
-        }
-
+    (pub extern $call:tt fn $fname:ident($($arg:ident : $t:ty),*) $(-> $rv:ty)* { $($body:tt)* } $($rest:tt)*) => ( interpolate_idents! {
         #[allow(dead_code)]
         #[inline(always)]
         pub fn $fname($($arg : $t),*) $(-> $rv)* {
-            unsafe {
-                ($name.$fname)($($arg),*)
-            }
+            let f = POINTERS.read().unwrap().$fname;
+            f.call($($arg),*)
         }
 
-        fn [My $fname](&mut $s, $($arg : $t),*) $(-> $rv)* {
+        extern $call fn [My $fname]($($arg : $t),*) $(-> $rv)* {
             $($body)*
         }
+    } hook_struct_impl! { $($rest)* } );
 
-    } hook_struct_impl! { $name $($rest)* } );
-
-    ($name:ident) => ();
-}
-
-macro_rules! hook_struct_gen_init {
-    ($stype:ident $(I $fname:ident $init:expr)*) => (
-        $stype {
-            $($fname : $init),*
-        }
-    );
-}
-
-macro_rules! hook_struct_init {
-    ($stype:ident I $($rest:tt)*) => (
-        hook_struct_gen_init! { $stype I $($rest)* }
-    );
-
-    // Field
-    ($stype:ident pub $name:ident : $t:ty = $init:expr , $($rest:tt)*) => (
-        hook_struct_init! { $stype $($rest)* I $name $init }
-    );
-
-    // Function field
-    ($stype:ident pub $name:ident : extern $call:tt fn($($arg:ident : $t:ty),*) $(-> $rv:ty)* , $($rest:tt)*) => ( interpolate_idents! {
-        hook_struct_init! { $stype $($rest)* I $name $stype :: [$name _default] }
-    } );
-
-    // Function
-    ($stype:ident pub extern $call:tt fn $name:ident(&mut $s:ident $(, $arg:ident : $t:ty)*) $(-> $rv:ty)* { $($body:tt)* } $($rest:tt)*) => ( interpolate_idents! {
-        hook_struct_init! { $stype $($rest)* I $name $stype :: [$name _default] }
-    } );
+    () => ();
 }
 
 macro_rules! hook_struct {
-    ($name:ident = pub struct $stype:ident { $($fields:tt)* } impl $_stype:ident { $($fns:tt)* }) => (
+    (#[derive(Default)]
+     pub struct $stype:ident {
+         $($fields:tt)*
+     }
+
+     impl $_stype:ident {
+         $($fns:tt)*
+     }) => (
+        lazy_static! {
+            pub static ref POINTERS: RwLock<$stype> = RwLock::new($stype::default());
+        }
+
         hook_struct_fields! { $stype $($fields)* $($fns)* }
 
         impl $stype {
-            hook_struct_impl! { $name $($fields)* $($fns)* }
+            hook_struct_impl! { $($fields)* $($fns)* }
+        }
+    );
+}
 
-            #[allow(dead_code)]
-            fn clear(&mut self) {
-                *self = hook_struct_init! { $stype $($fields)* $($fns)* };
+macro_rules! gen_function_impls {
+    (@make_impl ($($extern_type:tt)*) ($($arg_name:ident : $arg_type:ident),*)) => (
+        impl<R $(, $arg_type)*> Default for Function<$($extern_type)* fn($($arg_type),*) -> R> {
+            #[inline(always)]
+            fn default() -> Self {
+                Function {
+                    ptr: Self::default_func as $($extern_type)* fn($($arg_type),*) -> R,
+                }
             }
         }
 
-        pub static mut $name: $stype = hook_struct_init! { $stype $($fields)* $($fns)* };
+        #[allow(dead_code)]
+        impl<R $(, $arg_type)*> Function<$($extern_type)* fn($($arg_type),*) -> R> {
+            #[inline(always)]
+            pub fn is_default(&self) -> bool {
+                self.ptr as *const usize == Self::default_func as *const usize
+            }
+
+            #[inline(always)]
+            pub fn call(&self $(, $arg_name : $arg_type)*) -> R {
+                (self.ptr)($($arg_name),*)
+            }
+
+            // This should never be called.
+            $($extern_type)* fn default_func($(_: $arg_type),*) -> R {
+                unsafe { std::intrinsics::breakpoint(); }
+                unreachable!();
+            }
+        }
+    );
+
+    (@gen_impls $($arg_name:ident : $arg_type:ident),*) => (
+        gen_function_impls!(@make_impl (                 ) ($($arg_name : $arg_type),*));
+        gen_function_impls!(@make_impl (extern "C"       ) ($($arg_name : $arg_type),*));
+        gen_function_impls!(@make_impl (extern "system"  ) ($($arg_name : $arg_type),*));
+        gen_function_impls!(@make_impl (extern "fastcall") ($($arg_name : $arg_type),*));
+    );
+
+    () => (
+        gen_function_impls!(@gen_impls);
+    );
+
+    ($first_arg_name:ident : $first_arg_type:ident $(, $arg_name:ident : $arg_type:ident)*) => (
+        gen_function_impls!(@gen_impls $first_arg_name : $first_arg_type $(, $arg_name : $arg_type)*);
+        gen_function_impls!($($arg_name : $arg_type),*);
     );
 }
 
@@ -155,12 +147,12 @@ macro_rules! pattern {
 }
 
 macro_rules! hook {
-    ($target:tt, $s:ident, $(($ftarget:expr, $fname:ident)),+) => {{
+    ($target:tt, $stype:ident, $s:ident, $(($ftarget:expr, $fname:ident)),+) => {{
         $(
             if let Some(ftarget) = $ftarget {
                 if let Err(err) = { interpolate_idents! {
-                    let detour = Self::[$fname _hook];
-                    let trampoline = &mut $s.$fname;
+                    let detour = $stype::[My $fname];
+                    let trampoline = &mut $s.$fname.ptr;
 
                     // This is needed to cast from function item type to function pointer type.
                     let mut temp = *trampoline;
@@ -178,7 +170,7 @@ macro_rules! hook {
 
         if let Err(err) = $crate::minhook::apply_queued()
             .map_err(|e| format!("Error enabling queued hooks: {}", e)) {
-            error!(target: $target, "{}", err);            
+            error!(target: $target, "{}", err);
         }
     }}
 }
@@ -186,9 +178,9 @@ macro_rules! hook {
 macro_rules! unhook {
     ($target:tt, $s:ident, $($fname:ident),+) => {{ interpolate_idents! {
         $(
-            if $s.$fname as *const () != Self::[$fname _default] as *const () {
+            if !$s.$fname.is_default() {
                 if let Err(err) = {
-                    $crate::minhook::queue_disable_hook(Some($s.$fname as winapi::LPVOID))
+                    $crate::minhook::queue_disable_hook(Some($s.$fname.ptr as winapi::LPVOID))
                             .map_err(|e| format!("Error adding hook to disable queue: {}", e))
                 } {
                     error!(target: $target, "{}", err);
@@ -198,13 +190,13 @@ macro_rules! unhook {
 
         if let Err(err) = $crate::minhook::apply_queued()
             .map_err(|e| format!("Error disabling queued hooks: {}", e)) {
-            error!(target: $target, "{}", err);            
+            error!(target: $target, "{}", err);
         }
 
         $(
-            if $s.$fname as *const () != Self::[$fname _default] as *const () {
+            if !$s.$fname.is_default() {
                 if let Err(err) = {
-                    $crate::minhook::remove_hook(Some($s.$fname as winapi::LPVOID))
+                    $crate::minhook::remove_hook(Some($s.$fname.ptr as winapi::LPVOID))
                             .map_err(|e| format!("Error removing hook: {}", e))
                 } {
                     error!(target: $target, "{}", err);

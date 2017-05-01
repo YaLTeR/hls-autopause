@@ -1,64 +1,81 @@
+use features;
+use function::Function;
 use hookable::Hookable;
+use hooks::*;
 use libc;
 use moduleinfo::ModuleInfo;
-use std::{self, ffi};
+use std::ffi;
+use std::sync::RwLock;
 use utils;
 use widestring::WideCStr;
 use winapi::*;
 
+lazy_static! {
+    pub static ref MODULE: RwLock<Kernel32Module> = RwLock::new(Kernel32Module::default());
+
+    static ref HOOKS: [&'static RwLock<Hookable>; 2] = [
+        server::MODULE.deref(),
+        engine::MODULE.deref()
+    ];
+}
+
+#[derive(Default)]
+pub struct Kernel32Module {
+    module_info: Option<ModuleInfo>,
+}
+
 hook_struct! {
-    k32 = pub struct Kernel32 {
-        pub module_info: Option<ModuleInfo> = None,
-        pub hooks: Option<Vec<&'static mut Hookable>> = None,
+    #[derive(Default)]
+    pub struct Kernel32 {
     }
 
     impl Kernel32 {
-        pub extern "system" fn LoadLibraryA(&mut self, lpFileName: LPCSTR) -> HMODULE {
+        pub extern "system" fn LoadLibraryA(lpFileName: LPCSTR) -> HMODULE {
             let rv = Kernel32::LoadLibraryA(lpFileName);
 
             let filename = unsafe { ffi::CStr::from_ptr(lpFileName).to_string_lossy() };
             trace!(target: "kernel32", "LoadLibraryA(\"{}\") -> {:p}", filename, rv);
 
-            self.hook_module(rv);
+            Kernel32::hook_module(rv);
 
             rv
         }
 
-        pub extern "system" fn LoadLibraryW(&mut self, lpFileName: LPCWSTR) -> HMODULE {
+        pub extern "system" fn LoadLibraryW(lpFileName: LPCWSTR) -> HMODULE {
             let rv = Kernel32::LoadLibraryW(lpFileName);
 
             let filename = unsafe { WideCStr::from_ptr_str(lpFileName).to_string_lossy() };
             trace!(target: "kernel32", "LoadLibraryW(\"{}\") -> {:p}", filename, rv);
 
-            self.hook_module(rv);
+            Kernel32::hook_module(rv);
 
             rv
         }
 
-        pub extern "system" fn LoadLibraryExA(&mut self, lpFileName: LPCSTR, hFile: HANDLE, dwFlags: DWORD) -> HMODULE {
+        pub extern "system" fn LoadLibraryExA(lpFileName: LPCSTR, hFile: HANDLE, dwFlags: DWORD) -> HMODULE {
             let rv = Kernel32::LoadLibraryExA(lpFileName, hFile, dwFlags);
 
             let filename = unsafe { ffi::CStr::from_ptr(lpFileName).to_string_lossy() };
             trace!(target: "kernel32", "LoadLibraryExA(\"{}\") -> {:p}", filename, rv);
 
-            self.hook_module(rv);
+            Kernel32::hook_module(rv);
 
             rv
         }
 
-        pub extern "system" fn LoadLibraryExW(&mut self, lpFileName: LPCWSTR, hFile: HANDLE, dwFlags: DWORD) -> HMODULE {
+        pub extern "system" fn LoadLibraryExW(lpFileName: LPCWSTR, hFile: HANDLE, dwFlags: DWORD) -> HMODULE {
             let rv = Kernel32::LoadLibraryExW(lpFileName, hFile, dwFlags);
 
             let filename = unsafe { WideCStr::from_ptr_str(lpFileName).to_string_lossy() };
             trace!(target: "kernel32", "LoadLibraryExW(\"{}\") -> {:p}", filename, rv);
 
-            self.hook_module(rv);
+            Kernel32::hook_module(rv);
 
             rv
         }
 
-        pub extern "system" fn FreeLibrary(&mut self, hModule: HMODULE) -> BOOL {
-            self.unhook_module(hModule);
+        pub extern "system" fn FreeLibrary(hModule: HMODULE) -> BOOL {
+            Kernel32::unhook_module(hModule);
 
             let rv = Kernel32::FreeLibrary(hModule);
 
@@ -69,12 +86,9 @@ hook_struct! {
     }
 }
 
-impl Kernel32 {
-    pub fn hook(&mut self, module_info: &ModuleInfo, hooks: Vec<&'static mut Hookable>) {
+impl Kernel32Module {
+    pub fn hook(&mut self, module_info: &ModuleInfo) {
         self.module_info = Some(module_info.clone());
-        let module_info = self.module_info.as_ref().unwrap();
-
-        self.hooks = Some(hooks);
 
         debug!(target: "kernel32", "Base: {:p}; size = {}", module_info.base, module_info.size);
 
@@ -92,7 +106,9 @@ impl Kernel32 {
             (addr_FreeLibrary, "FreeLibrary")
         );
 
-        hook!("kernel32", self,
+        let mut pointers = POINTERS.write().unwrap();
+
+        hook!("kernel32", Kernel32, pointers,
             (addr_LoadLibraryA, LoadLibraryA),
             (addr_LoadLibraryW, LoadLibraryW),
             (addr_LoadLibraryExA, LoadLibraryExA),
@@ -100,38 +116,67 @@ impl Kernel32 {
             (addr_FreeLibrary, FreeLibrary)
         );
     }
+}
 
-    pub fn initial_hook(&mut self) {
+impl Kernel32 {
+    pub fn initial_hook() {
         let modules = ModuleInfo::get_loaded();
 
-        for hook in self.hooks.as_mut().unwrap().iter_mut() {
-            if let Some(module) = hook.pick_best_hook_target(&modules) {
-                hook.hook(module);
+        let mut hooked_something = false;
+
+        for hook in HOOKS.iter() {
+            if let Some(module) = hook.read().unwrap().pick_best_hook_target(&modules) {
+                hook.write().unwrap().hook(module);
+                hooked_something = true;
             }
+        }
+
+        if hooked_something {
+            features::refresh();
         }
     }
 
-    fn hook_module(&mut self, handle: HMODULE) {
+    fn hook_module(handle: HMODULE) {
         if let Some(module) = utils::get_module_info(handle) {
-            for hook in self.hooks.as_mut().unwrap().iter_mut() {
-                if hook.should_hook(&module) {
+            let mut hooked_something = false;
+
+            for hook in HOOKS.iter() {
+                if hook.read().unwrap().should_hook(&module) {
+                    let mut hook = hook.write().unwrap();
+
                     if hook.module_info().is_some() {
                         hook.unhook();
                     }
 
                     hook.hook(&module);
+
+                    hooked_something = true;
                 }
+            }
+
+            if hooked_something {
+                features::refresh();
             }
         }
     }
 
-    fn unhook_module(&mut self, handle: HMODULE) {
-        for hook in self.hooks.as_mut().unwrap().iter_mut() {
-            if hook.module_info().is_some() {
-                if hook.module_info().unwrap().handle == handle {
-                    hook.unhook();
+    fn unhook_module(handle: HMODULE) {
+        let mut unhooked_something = false;
+
+        for hook in HOOKS.iter() {
+            let hook_read = hook.read().unwrap();
+
+            if hook_read.module_info().is_some() {
+                if hook_read.module_info().unwrap().handle == handle {
+                    drop(hook_read);
+                    hook.write().unwrap().unhook();
+                    unhooked_something = true;
                 }
             }
+        }
+
+        if unhooked_something {
+            features::refresh();
         }
     }
 }

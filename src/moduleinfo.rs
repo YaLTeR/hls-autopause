@@ -12,6 +12,9 @@ pub struct ModuleInfo {
     pub size: usize,
 }
 
+unsafe impl Send for ModuleInfo {}
+unsafe impl Sync for ModuleInfo {}
+
 impl ModuleInfo {
     pub fn get(name: &str) -> Option<ModuleInfo> {
         unsafe {

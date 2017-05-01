@@ -1,5 +1,4 @@
-use hooks::{engine, server};
-use libc::*;
+use hooks::*;
 
 struct Feature {
     name: &'static str,
@@ -26,18 +25,21 @@ fn log() {
 
 pub fn refresh() {
     unsafe {
+        let engine = engine::POINTERS.read().unwrap();
+        let server = server::POINTERS.read().unwrap();
+
         AUTOPAUSE.enabled =
-            engine::engine.Cbuf_AddText != engine::Engine::Cbuf_AddText_default
-            && engine::engine.Host_Spawn_f != engine::Engine::Host_Spawn_f_default
-            && engine::engine.Host_UnPause_f != engine::Engine::Host_UnPause_f_default;
+            !engine.Cbuf_AddText.is_default()
+            && !engine.Host_Spawn_f.is_default()
+            && !engine.Host_UnPause_f.is_default();
 
         CONSOLE_COMMANDS.enabled =
-            engine::engine.icvar != 0 as *mut engine::icvar::ICVar
-            && engine::engine.concommand_vtable != 0 as *mut c_void;
+            engine.icvar.is_some()
+            && engine.concommand_vtable.is_some();
 
         AUTOJUMP.enabled =
-            server::server.CHL1GameMovement__CheckJumpButton as *const () != server::Server::CHL1GameMovement__CheckJumpButton_default as *const ()
-            && server::server.CGameMovement__FinishGravity as *const () != server::Server::CGameMovement__FinishGravity_default as *const ();
+            !server.CHL1GameMovement__CheckJumpButton.is_default()
+            && !server.CGameMovement__FinishGravity.is_default()
     }
 
     log();

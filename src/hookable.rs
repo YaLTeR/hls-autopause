@@ -6,7 +6,7 @@ pub trait HookableFilter {
     fn pick_best_hook_target<'a>(&self, modules: &'a Vec<ModuleInfo>) -> Option<&'a ModuleInfo>;
 }
 
-pub trait Hookable : HookableFilter {
+pub trait Hookable : Send + Sync + HookableFilter {
     fn module_info(&self) -> Option<&ModuleInfo>;
     fn hook(&mut self, module_info: &ModuleInfo);
     fn unhook(&mut self);
